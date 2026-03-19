@@ -8,7 +8,7 @@ import { createLogger } from "./logger.js";
 import { registerSocketHandlers } from "./socket.js";
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "*";
+const CLIENT_ORIGIN = "https://shadowroom-chat.netlify.app";
 const PIN_TTL_MS = process.env.PIN_TTL_MS ? Number(process.env.PIN_TTL_MS) : 10 * 60 * 1000;
 
 const logger = createLogger();
@@ -16,16 +16,19 @@ const app = express();
 
 const corsCredentials = CLIENT_ORIGIN !== "*";
 
-app.use(
-  cors({
-    origin: CLIENT_ORIGIN,
-    credentials: corsCredentials,
-  })
-);
+app.use(cors({
+  origin: CLIENT_ORIGIN,
+  methods: ["GET", "POST"],
+  credentials: true
+}));
 app.use(express.json({ limit: "1mb" }));
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
+});
+
+app.get("/", (_req, res) => {
+  res.send("ShadowRoom Backend is running. Please use the frontend to connect.");
 });
 
 // In-memory room + file stores for demo purposes.
@@ -141,7 +144,7 @@ const io = new SocketIOServer(server, {
   cors: {
     origin: CLIENT_ORIGIN,
     methods: ["GET", "POST"],
-    credentials: corsCredentials,
+    credentials: true,
   },
 });
 
@@ -151,7 +154,18 @@ registerSocketHandlers(io, { pinStore, logger });
 // Cleanup expired PINs periodically.
 setInterval(() => pinStore.cleanupExpired(), 30 * 1000).unref?.();
 
+app.get('/', (req, res) => {
+  res.status(200).send("ShadowRoom Backend is Live and Active");
+});
+
 server.listen(PORT, () => {
   logger.info("signaling server listening", { port: PORT, clientOrigin: CLIENT_ORIGIN });
 });
 
+// Self-ping every 10 minutes to stay awake on Render
+const URL = "https://shadowroom.onrender.com/health";
+setInterval(() => {
+  http.get(URL, (res) => {
+    console.log(`Self-ping status: ${res.statusCode}`);
+  });
+}, 600000); // 10 minutes
