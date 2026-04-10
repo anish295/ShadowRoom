@@ -99,10 +99,10 @@ const server = http.createServer(app);
 
 const io = new SocketIOServer(server, {
   cors: {
-    origin: CLIENT_ORIGIN,
+    origin: CLIENT_ORIGIN, // Use the variable from your .env or Render settings
     methods: ["GET", "POST"],
-    credentials: corsCredentials,
-  },
+    credentials: true
+  }
 });
 
 const pinStore = new PinStore({ ttlMs: PIN_TTL_MS });
