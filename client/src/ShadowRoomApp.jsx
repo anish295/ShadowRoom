@@ -10,6 +10,7 @@ import React, {
 import { io } from "socket.io-client";
 import axios from "axios";
 import { sendFileP2P, setupFileReceiver, triggerDownload } from "./services/fileTransfer.js";
+import logo from "./android-chrome-512x512.png";
 
 // Lazy-load heavy animation component for smaller initial bundle
 const HeroGeometric = lazy(() => import("./components/ui/HeroGeometric.jsx"));
