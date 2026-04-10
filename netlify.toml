@@ -6,7 +6,7 @@
   publish = "dist"
 
 [build.environment]
-  # Set in Netlify dashboard: VITE_SIGNALING_URL = your Render backend URL (e.g. https://your-app.onrender.com)
+  # Set VITE_SIGNALING_URL to your backend URL (default: http://localhost:3001)
   NODE_VERSION = "20"
 
 # SPA: all routes serve index.html (client-side routing if you add it later)

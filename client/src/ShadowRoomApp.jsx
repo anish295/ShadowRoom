@@ -7,15 +7,15 @@ import React, {
   lazy,
   Suspense,
 } from "react";
+import { Moon, Sun } from "lucide-react";
 import { io } from "socket.io-client";
 import axios from "axios";
 import { sendFileP2P, setupFileReceiver, triggerDownload } from "./services/fileTransfer.js";
-import logo from "./android-chrome-512x512.png";
 
 // Lazy-load heavy animation component for smaller initial bundle
 const HeroGeometric = lazy(() => import("./components/ui/HeroGeometric.jsx"));
 
-const API_BASE = import.meta.env.VITE_SIGNALING_URL || "https://shadowroom.onrender.com";
+const API_BASE = import.meta.env.VITE_SIGNALING_URL || "http://localhost:3001";
 const SESSION_KEY = "shadowroom-session";
 
 function loadSession() {
@@ -185,6 +185,17 @@ export function ShadowRoomApp() {
   const typingTimeoutRef = useRef(null);
   const isTypingRef = useRef(false);
 
+  const rotatingTitles = useMemo(
+    () => [
+      "Private Sharing",
+      "Signal-Proof Rooms",
+      "Serverless SCTP Mesh",
+      "Zero-Knowledge Sessions",
+    ],
+    [],
+  );
+  const [titleIndex, setTitleIndex] = useState(0);
+
   // ==================== HELPERS ====================
   const showToast = useCallback((title, message, type = "success") => {
     const id = ++toastId;
@@ -282,6 +293,13 @@ export function ShadowRoomApp() {
   }, []);
 
   // ==================== SOCKET ====================
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTitleIndex((prev) => (prev + 1) % rotatingTitles.length);
+    }, 2600);
+    return () => clearInterval(interval);
+  }, [rotatingTitles.length]);
+
   useEffect(() => {
     socket.on("connect", () => {
       socketConnectedRef.current = true;
@@ -990,9 +1008,13 @@ export function ShadowRoomApp() {
     <div className="page landing-page active" style={{ position: "relative" }}>
       {/* Navbar */}
       <nav className="navbar">
-        <div className="logo">
+        <div className="logo logo-left-corner">
           <div className="logo-icon">
-            <img src={logo} alt="ShadowRoom Logo"/>
+            <img
+              src="/android-chrome-512x512.png"
+              alt="ShadowRoom Logo"
+              className="logo-mark"
+            />
           </div>
           <span>ShadowRoom</span>
         </div>
@@ -1002,7 +1024,9 @@ export function ShadowRoomApp() {
             onClick={toggleTheme}
             title="Toggle Theme"
           >
-            <i className={`fas ${isDarkMode ? "fa-moon" : "fa-sun"}`}></i>
+            <span className={`theme-icon-wrap ${isDarkMode ? "is-dark" : "is-light"}`}>
+              {isDarkMode ? <Moon size={18} /> : <Sun size={18} />}
+            </span>
           </button>
         </div>
       </nav>
@@ -1028,6 +1052,8 @@ export function ShadowRoomApp() {
         }
       >
         <HeroGeometric
+          title1="The Future of"
+          title2={rotatingTitles[titleIndex]}
           onCreateRoom={() => setCreateModalOpen(true)}
           onJoinRoom={() => setJoinModalOpen(true)}
         />
@@ -1086,8 +1112,8 @@ export function ShadowRoomApp() {
             </div>
             <h3 className="feature-title">Peer-to-Peer File Beam</h3>
             <p className="feature-desc">
-              Stream files of any size directly to a peer using chunked WebRTC
-              transfers with real-time progress and flow control.
+              Direct Browser-to-Browser SCTP Channels (Serverless). No relay
+              payloads, no data persistence, no surveillance surface.
             </p>
           </div>
           <div className="feature-card">
@@ -1096,8 +1122,8 @@ export function ShadowRoomApp() {
             </div>
             <h3 className="feature-title">Serverless Signaling</h3>
             <p className="feature-desc">
-              The server only brokers the initial WebRTC handshake via Socket.IO
-              — after that, all data flows directly between peers.
+              Direct Browser-to-Browser SCTP Channels (Serverless). Signaling only
+              bootstraps peers, then payloads remain end-to-end in-browser.
             </p>
           </div>
         </div>
@@ -1158,7 +1184,7 @@ export function ShadowRoomApp() {
       <header className="chat-header">
         <div className="chat-room-info">
           <div className="room-avatar">
-            <img src={logo} alt="ShadowRoom Logo"/>
+            <img src="/android-chrome-512x512.png" alt="ShadowRoom Logo" className="logo-mark" />
           </div>
           <div className="room-details">
             <h3>ShadowRoom</h3>
@@ -1210,9 +1236,9 @@ export function ShadowRoomApp() {
                       setMobileActionsVisible(false);
                     }}
                   >
-                    <i
-                      className={`fas ${isDarkMode ? "fa-moon" : "fa-sun"}`}
-                    ></i>
+                    <span className={`theme-icon-wrap ${isDarkMode ? "is-dark" : "is-light"}`}>
+                      {isDarkMode ? <Moon size={16} /> : <Sun size={16} />}
+                    </span>
                     Theme
                   </button>
                   <button
@@ -1246,7 +1272,9 @@ export function ShadowRoomApp() {
                 title="Toggle Theme"
                 style={{ width: 45, height: 45 }}
               >
-                <i className={`fas ${isDarkMode ? "fa-moon" : "fa-sun"}`}></i>
+                <span className={`theme-icon-wrap ${isDarkMode ? "is-dark" : "is-light"}`}>
+                  {isDarkMode ? <Moon size={18} /> : <Sun size={18} />}
+                </span>
               </button>
               <button
                 className="header-btn danger"
@@ -1524,6 +1552,7 @@ export function ShadowRoomApp() {
                 return (
                   <div
                     key={tid}
+                    className="transfer-glass"
                     style={{ marginBottom: "0.75rem", position: "relative" }}
                   >
                     <div
@@ -1947,14 +1976,15 @@ export function ShadowRoomApp() {
       {pendingOffers.length > 0 && (
         <div style={{
           position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)",
+          background: "rgba(15,17,29,0.65)", backdropFilter: "blur(24px)",
           display: "flex", alignItems: "center", justifyContent: "center",
           zIndex: 10000, padding: "1rem",
         }}>
           <div style={{
-            background: "var(--bg-card, #1e1e2e)", border: "1px solid var(--border, #333)",
+            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
             borderRadius: 22, padding: "2rem", maxWidth: 460, width: "100%",
             boxShadow: "0 28px 70px rgba(0,0,0,0.6)",
+            backdropFilter: "blur(40px)",
           }}>
             {/* Header */}
             <div className="download-list-header">

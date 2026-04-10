@@ -15,9 +15,9 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20
-      # Optional: override port (Render sets PORT automatically)
+      # Optional: override port (default: 3001)
       # - key: PORT
       #   value: 3001
-      # Optional: restrict CORS to your Netlify frontend URL
+      # Optional: set CLIENT_ORIGIN for CORS (default: http://localhost:3000)
       # - key: CLIENT_ORIGIN
-      #   value: https://your-app.netlify.app
+      #   value: http://localhost:3000

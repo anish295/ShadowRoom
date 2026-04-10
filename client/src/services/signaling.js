@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
 
-const DEFAULT_SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL || "https://shadowroom.onrender.com";
+const DEFAULT_SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL || "http://localhost:3001";
 const CONNECT_WAIT_MS = 8000;
 const RESPONSE_TIMEOUT_MS = 10000;
 

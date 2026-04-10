@@ -20,6 +20,15 @@ export default {
           border: 'var(--border)',
           'border-light': 'var(--border-light)',
         },
+        industry: {
+          'base-dark': '#0F111D',
+          'base-light': '#F7D569',
+          'signal-active': '#F7D569',
+          'signal-warning': '#F7C25A',
+          'ink-dark': '#0F111D',
+          'ink-light': '#FFFFFF',
+          'ink-muted': '#94A3B8',
+        },
       },
       boxShadow: {
         soft: "0 10px 30px rgba(0,0,0,0.12)",

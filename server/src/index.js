@@ -8,17 +8,48 @@ import { createLogger } from "./logger.js";
 import { registerSocketHandlers } from "./socket.js";
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "https://shadowroom-chat.netlify.app";
+function normalizeOrigin(value) {
+  if (!value) return "";
+
+  try {
+    return new URL(value).origin;
+  } catch {
+    return value.replace(/\/$/, "");
+  }
+}
+
+const rawClientOrigin = process.env.CLIENT_ORIGIN || "";
+const allowedOrigins = rawClientOrigin
+  .split(",")
+  .map((o) => normalizeOrigin(o.trim()))
+  .filter(Boolean);
+
+function isOriginAllowed(origin) {
+  // allow non-browser requests (health checks, curl, server-to-server)
+  if (!origin) return true;
+  if (allowedOrigins.length === 0) return true;
+  if (allowedOrigins.includes("*")) return true;
+  return allowedOrigins.includes(normalizeOrigin(origin));
+}
+
+function corsOriginValidator(origin, callback) {
+  if (isOriginAllowed(origin)) {
+    callback(null, true);
+    return;
+  }
+  callback(new Error("Origin not allowed by CLIENT_ORIGIN"));
+}
+
 const PIN_TTL_MS = process.env.PIN_TTL_MS ? Number(process.env.PIN_TTL_MS) : 10 * 60 * 1000;
 
 const logger = createLogger();
 const app = express();
 
-const corsCredentials = CLIENT_ORIGIN !== "*";
+const corsCredentials = !(allowedOrigins.length === 1 && allowedOrigins[0] === "*");
 
 app.use(
   cors({
-    origin: CLIENT_ORIGIN,
+    origin: corsOriginValidator,
     credentials: corsCredentials,
   })
 );
@@ -99,9 +130,9 @@ const server = http.createServer(app);
 
 const io = new SocketIOServer(server, {
   cors: {
-    origin: CLIENT_ORIGIN, // Use the variable from your .env or Render settings
+    origin: corsOriginValidator,
     methods: ["GET", "POST"],
-    credentials: true
+    credentials: corsCredentials
   }
 });
 
@@ -123,5 +154,8 @@ setInterval(() => {
 }, 5 * 60 * 1000).unref?.();
 
 server.listen(PORT, () => {
-  logger.info("signaling server listening", { port: PORT, clientOrigin: CLIENT_ORIGIN });
+  logger.info("signaling server listening", {
+    port: PORT,
+    clientOrigin: allowedOrigins.length ? allowedOrigins : ["* (auto)"]
+  });
 });

@@ -11,7 +11,7 @@
  * Lazy-loaded via React.lazy() — framer-motion stays out of main bundle.
  */
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 
 // ---------- Reduced-motion detection ----------
@@ -123,7 +123,7 @@ export default function HeroGeometric({
         <div className="geo-hero-gradient-bottom" />
         <div className="geo-hero-grain" />
         <div className="geo-hero-light-leak" />
-        <FloatingParticles count={24} />
+        <FloatingParticles count={20} />
       </div>
 
       {/* Glassmorphic shapes — varied depth via blur levels */}
@@ -195,17 +195,32 @@ export default function HeroGeometric({
           <FadeText delay={0.8} className="geo-title-line" reducedMotion={reducedMotion}>
             {title1}
           </FadeText>
-          <FadeText delay={1.0} className="geo-title-gradient-line" reducedMotion={reducedMotion}>
-            {title2}
-          </FadeText>
+          <span className="geo-title-rotator" aria-live="polite">
+            <AnimatePresence mode="wait">
+              <motion.span
+                key={title2}
+                className="geo-title-solid-line"
+                initial={reducedMotion ? false : { y: 100, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={reducedMotion ? undefined : { y: -100, opacity: 0 }}
+                transition={
+                  reducedMotion
+                    ? { duration: 0 }
+                    : { type: "spring", stiffness: 160, damping: 22 }
+                }
+              >
+                {title2}
+              </motion.span>
+            </AnimatePresence>
+          </span>
         </h1>
 
         {/* Subtitle */}
         <FadeText delay={1.2} reducedMotion={reducedMotion}>
           <p className="geo-subtitle">
-            Anonymous, real-time chat rooms with P2P file sharing.
+            Anonymous rooms with zero-knowledge messaging and direct WebRTC transfers.
             <br />
-            No sign-up. No tracking. No server storage.
+            Server only handles signaling. Payloads stay browser-to-browser.
           </p>
         </FadeText>
 
