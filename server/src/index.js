@@ -8,7 +8,7 @@ import { createLogger } from "./logger.js";
 import { registerSocketHandlers } from "./socket.js";
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "*";
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "https://shadowroom-chat.netlify.app";
 const PIN_TTL_MS = process.env.PIN_TTL_MS ? Number(process.env.PIN_TTL_MS) : 10 * 60 * 1000;
 
 const logger = createLogger();

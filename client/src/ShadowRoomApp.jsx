@@ -15,7 +15,7 @@ import logo from "./android-chrome-512x512.png";
 // Lazy-load heavy animation component for smaller initial bundle
 const HeroGeometric = lazy(() => import("./components/ui/HeroGeometric.jsx"));
 
-const API_BASE = import.meta.env.VITE_SIGNALING_URL || "http://localhost:3001";
+const API_BASE = import.meta.env.VITE_SIGNALING_URL || "https://shadowroom.onrender.com";
 const SESSION_KEY = "shadowroom-session";
 
 function loadSession() {
@@ -1008,13 +1008,25 @@ export function ShadowRoomApp() {
       </nav>
 
       {/* Hero — Geometric animated section */}
-      <Suspense fallback={
-        <section className="hero" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div className="hero-content" style={{ textAlign: "center" }}>
-            <h1 className="hero-title" style={{ color: "#fff" }}>ShadowRoom</h1>
-          </div>
-        </section>
-      }>
+      <Suspense
+        fallback={
+          <section
+            className="hero"
+            style={{
+              minHeight: "100vh",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div className="hero-content" style={{ textAlign: "center" }}>
+              <h1 className="hero-title" style={{ color: "#fff" }}>
+                ShadowRoom
+              </h1>
+            </div>
+          </section>
+        }
+      >
         <HeroGeometric
           onCreateRoom={() => setCreateModalOpen(true)}
           onJoinRoom={() => setJoinModalOpen(true)}
@@ -1054,8 +1066,8 @@ export function ShadowRoomApp() {
             </div>
             <h3 className="feature-title">Volatile Sessions</h3>
             <p className="feature-desc">
-              Rooms exist only in memory. When the last peer disconnects,
-              every message and file reference is permanently erased.
+              Rooms exist only in memory. When the last peer disconnects, every
+              message and file reference is permanently erased.
             </p>
           </div>
           <div className="feature-card">
@@ -1064,8 +1076,8 @@ export function ShadowRoomApp() {
             </div>
             <h3 className="feature-title">E2E Encrypted Relay</h3>
             <p className="feature-desc">
-              Chat messages are AES-encrypted client-side before reaching
-              the signaling layer. Only participants hold the key.
+              Chat messages are AES-encrypted client-side before reaching the
+              signaling layer. Only participants hold the key.
             </p>
           </div>
           <div className="feature-card">
@@ -1074,8 +1086,8 @@ export function ShadowRoomApp() {
             </div>
             <h3 className="feature-title">Peer-to-Peer File Beam</h3>
             <p className="feature-desc">
-              Stream files of any size directly to a peer using chunked
-              WebRTC transfers with real-time progress and flow control.
+              Stream files of any size directly to a peer using chunked WebRTC
+              transfers with real-time progress and flow control.
             </p>
           </div>
           <div className="feature-card">
@@ -1084,8 +1096,8 @@ export function ShadowRoomApp() {
             </div>
             <h3 className="feature-title">Serverless Signaling</h3>
             <p className="feature-desc">
-              The server only brokers the initial WebRTC handshake via
-              Socket.IO — after that, all data flows directly between peers.
+              The server only brokers the initial WebRTC handshake via Socket.IO
+              — after that, all data flows directly between peers.
             </p>
           </div>
         </div>
@@ -1198,7 +1210,9 @@ export function ShadowRoomApp() {
                       setMobileActionsVisible(false);
                     }}
                   >
-                    <i className={`fas ${isDarkMode ? "fa-moon" : "fa-sun"}`}></i>
+                    <i
+                      className={`fas ${isDarkMode ? "fa-moon" : "fa-sun"}`}
+                    ></i>
                     Theme
                   </button>
                   <button
@@ -1266,7 +1280,9 @@ export function ShadowRoomApp() {
                 ? `${sessionData.roomName.slice(0, 12)}${sessionData.roomName.length > 12 ? "..." : ""}`
                 : "Online Users"}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <div
+              style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+            >
               <span className="online-count">{connectedUsers.length}</span>
               <button
                 className="sidebar-close-btn"
@@ -1386,7 +1402,10 @@ export function ShadowRoomApp() {
               // ── System messages ──────────────────────────────────────
               if (m.type === "system") {
                 return (
-                  <div key={m.msgId || `sys-${m.ts}-${idx}`} className="system-message">
+                  <div
+                    key={m.msgId || `sys-${m.ts}-${idx}`}
+                    className="system-message"
+                  >
                     <div className="system-message-content">
                       <i className="fas fa-info-circle" />
                       {m.text}
@@ -1426,7 +1445,7 @@ export function ShadowRoomApp() {
                           onClick={() =>
                             setReplyingTo({
                               msgId: m.msgId,
-                              userName: m.self ? "You" : (m.userName || "Anon"),
+                              userName: m.self ? "You" : m.userName || "Anon",
                               snippet: (m.text || "").slice(0, 120),
                             })
                           }
@@ -1450,17 +1469,25 @@ export function ShadowRoomApp() {
                                 `[data-msg-id="${m.replyTo.msgId}"]`,
                               );
                               if (el) {
-                                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                                el.scrollIntoView({
+                                  behavior: "smooth",
+                                  block: "center",
+                                });
                                 el.classList.add("message-highlight");
                                 setTimeout(
-                                  () => el.classList.remove("message-highlight"),
+                                  () =>
+                                    el.classList.remove("message-highlight"),
                                   1600,
                                 );
                               }
                             }}
                           >
-                            <span className="reply-quote-author">{m.replyTo.userName}</span>
-                            <span className="reply-quote-text">{m.replyTo.snippet}</span>
+                            <span className="reply-quote-author">
+                              {m.replyTo.userName}
+                            </span>
+                            <span className="reply-quote-text">
+                              {m.replyTo.snippet}
+                            </span>
                           </div>
                         )}
                         {m.text}
@@ -1490,43 +1517,78 @@ export function ShadowRoomApp() {
           {/* Chat Input */}
           <div className="chat-input-area">
             {/* Active P2P transfer progress indicators */}
-            {Object.entries(activeTransfers).filter(([, t]) => t.direction === "out").map(([tid, t]) => {
-              const pct = Math.round((t.progress || 0) * 100);
-              return (
-                <div key={tid} style={{ marginBottom: "0.75rem", position: "relative" }}>
-                  <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <i className="fas fa-exchange-alt" style={{ color: "var(--accent)", fontSize: "0.75rem" }}></i>
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {t.status === "waiting" ? "Waiting for peer..." : `Sending “${t.fileName}” — ${pct}%`}
-                    </span>
-                  </div>
-                  <div className="sr-progress">
-                    <div className="sr-progress-fill" style={{ width: `${pct}%` }} />
-                  </div>
-                  <button
-                    type="button"
-                    className="upload-cancel-btn"
-                    onClick={() => {
-                      activeTransferCancelRef.current[tid]?.();
-                      setActiveTransfers((prev) => {
-                        const updated = { ...prev };
-                        delete updated[tid];
-                        return updated;
-                      });
-                    }}
+            {Object.entries(activeTransfers)
+              .filter(([, t]) => t.direction === "out")
+              .map(([tid, t]) => {
+                const pct = Math.round((t.progress || 0) * 100);
+                return (
+                  <div
+                    key={tid}
+                    style={{ marginBottom: "0.75rem", position: "relative" }}
                   >
-                    ✕
-                  </button>
-                </div>
-              );
-            })}
+                    <div
+                      style={{
+                        fontSize: "0.8rem",
+                        color: "var(--text-muted)",
+                        marginBottom: "0.25rem",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                      }}
+                    >
+                      <i
+                        className="fas fa-exchange-alt"
+                        style={{ color: "var(--accent)", fontSize: "0.75rem" }}
+                      ></i>
+                      <span
+                        style={{
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {t.status === "waiting"
+                          ? "Waiting for peer..."
+                          : `Sending “${t.fileName}” — ${pct}%`}
+                      </span>
+                    </div>
+                    <div className="sr-progress">
+                      <div
+                        className="sr-progress-fill"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="upload-cancel-btn"
+                      onClick={() => {
+                        activeTransferCancelRef.current[tid]?.();
+                        setActiveTransfers((prev) => {
+                          const updated = { ...prev };
+                          delete updated[tid];
+                          return updated;
+                        });
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
             {/* Reply preview strip */}
             {replyingTo && (
               <div className="reply-preview-strip">
                 <div className="reply-preview-content">
-                  <i className="fas fa-reply" style={{ color: "var(--accent)", flexShrink: 0 }} />
-                  <span className="reply-preview-author">Replying to {replyingTo.userName}</span>
-                  <span className="reply-preview-snippet">· {replyingTo.snippet}</span>
+                  <i
+                    className="fas fa-reply"
+                    style={{ color: "var(--accent)", flexShrink: 0 }}
+                  />
+                  <span className="reply-preview-author">
+                    Replying to {replyingTo.userName}
+                  </span>
+                  <span className="reply-preview-snippet">
+                    · {replyingTo.snippet}
+                  </span>
                 </div>
                 <button
                   className="reply-preview-close"
