@@ -1,0 +1,23 @@
+# Render Blueprint: deploy the backend (server) only
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: shadowroom-signaling
+    runtime: node
+
+    # Backend lives in server/
+    rootDir: server
+
+    buildCommand: npm install
+    startCommand: npm run start
+
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      # Optional: override port (Render sets PORT automatically)
+      # - key: PORT
+      #   value: 3001
+      # Optional: restrict CORS to your Netlify frontend URL
+      # - key: CLIENT_ORIGIN
+      #   value: https://your-app.netlify.app
