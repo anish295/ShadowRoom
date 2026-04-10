@@ -992,7 +992,7 @@ export function ShadowRoomApp() {
       <nav className="navbar">
         <div className="logo">
           <div className="logo-icon">
-            <img src="src/assets/android-chrome-512x512.png" alt="ShadowRoom Logo" />
+            <img src={logo} alt="ShadowRoom Logo" className="w-8 h-8 object-contain" />
           </div>
           <span>ShadowRoom</span>
         </div>
@@ -1146,7 +1146,7 @@ export function ShadowRoomApp() {
       <header className="chat-header">
         <div className="chat-room-info">
           <div className="room-avatar">
-            <img src="src/assets/android-chrome-512x512.png" alt="ShadowRoom Logo" />
+            <img src={logo} alt="ShadowRoom Logo" className="w-8 h-8 object-contain" />
           </div>
           <div className="room-details">
             <h3>ShadowRoom</h3>
