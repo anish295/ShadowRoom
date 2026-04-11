@@ -19,8 +19,9 @@ const HeroGeometric = lazy(() => import("./components/ui/HeroGeometric.jsx"));
 const API_BASE = import.meta.env.VITE_SIGNALING_URL || "https://shadowroom.onrender.com";
 const SESSION_KEY = "shadowroom-session";
 const QUICK_EMOJIS = [
-  "😀", "😁", "😂", "😎", "🤝", "🔥", "🚀", "✅",
-  "💬", "📎", "🎯", "🛡️", "⚡", "👀", "👍", "🙏",
+  "😂", "❤️", "🔥", "💯", "👍", "🙏", "💀", "😭",
+  "✨", "👀", "🤔", "🫡", "🫠", "🙌", "✅", "❌",
+  "🕵️", "🛡️", "🔒", "🚀", "⚡", "🤖", "📎", "🎯",
 ];
 
 function loadSession() {
@@ -881,13 +882,32 @@ export function ShadowRoomApp() {
     return () => window.removeEventListener("paste", onPaste);
   }, [handleFilesShare, showToast]);
 
-  const handleEmojiSelect = useCallback((emoji) => {
+  const handleEmojiClick = useCallback((emoji) => {
     setMessageText((prev) => `${prev}${emoji}`);
     setEmojiPickerOpen(false);
     requestAnimationFrame(() => {
       messageInputRef.current?.focus();
     });
   }, []);
+
+  const handlePaste = useCallback((event) => {
+    const clipboardItems = Array.from(event.clipboardData?.items || []);
+    const pastedFiles = clipboardItems
+      .filter((item) => item.kind === "file")
+      .map((item) => item.getAsFile())
+      .filter(Boolean);
+
+    if (pastedFiles.length === 0) return;
+
+    event.preventDefault();
+    setSelectedFiles((prev) => [...prev, ...pastedFiles]);
+    setFileModalOpen(true);
+    showToast(
+      "File Detected",
+      `Added ${pastedFiles.length} pasted file${pastedFiles.length > 1 ? "s" : ""} for review.`,
+      "info",
+    );
+  }, [showToast]);
 
   const handleLeaveRoom = () => {
     socket.emit("leave-room");
@@ -1699,15 +1719,19 @@ export function ShadowRoomApp() {
                     <Smile size={18} />
                   </button>
                   {emojiPickerOpen && (
-                    <div className="emoji-picker-panel" role="dialog" aria-label="Emoji picker">
-                      <div className="emoji-picker-header">Stealth Emoji Console</div>
+                    <div
+                      className="emoji-picker-panel bg-[#0F111D] shadow-[4px_4px_0px_0px_#F7D569]"
+                      role="dialog"
+                      aria-label="Emoji picker"
+                    >
+                      <div className="emoji-picker-header">Stealth Console</div>
                       <div className="emoji-grid">
                         {QUICK_EMOJIS.map((emoji) => (
                           <button
                             key={emoji}
                             type="button"
                             className="emoji-cell"
-                            onClick={() => handleEmojiSelect(emoji)}
+                            onClick={() => handleEmojiClick(emoji)}
                           >
                             {emoji}
                           </button>
@@ -1728,8 +1752,9 @@ export function ShadowRoomApp() {
               <div className="message-input-wrapper">
                 <input
                   ref={messageInputRef}
-                  className={`message-input ${replyingTo ? "border-[#F7D569] ring-2 ring-[#F7D569]/35" : ""}`}
-                  placeholder="Type your message..."
+                  onPaste={handlePaste}
+                  className={`message-input bg-slate-900/40 backdrop-blur-md border-2 border-transparent transition-all duration-300 focus:border-[#F7D569] focus:shadow-[0_0_15px_rgba(247,213,105,0.3)] focus:outline-none ${replyingTo ? "border-[#F7D569] shadow-[0_0_15px_rgba(247,213,105,0.3)]" : ""}`}
+                  placeholder={replyingTo ? `Replying to ${replyingTo.userName}...` : "Type a secure message..."}
                   value={messageText}
                   onChange={(e) => {
                     setMessageText(e.target.value);
