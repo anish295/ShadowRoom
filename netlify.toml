@@ -6,7 +6,8 @@
   publish = "dist"
 
 [build.environment]
-  # Set VITE_SIGNALING_URL to your backend URL (default: http://localhost:3001)
+  # Frontend talks to Render backend in production
+  VITE_SIGNALING_URL = "https://shadowroom.onrender.com"
   NODE_VERSION = "20"
 
 # SPA: all routes serve index.html (client-side routing if you add it later)

@@ -11,11 +11,12 @@ import { Moon, Sun } from "lucide-react";
 import { io } from "socket.io-client";
 import axios from "axios";
 import { sendFileP2P, setupFileReceiver, triggerDownload } from "./services/fileTransfer.js";
+import logo from "./android-chrome-512x512.png";
 
 // Lazy-load heavy animation component for smaller initial bundle
 const HeroGeometric = lazy(() => import("./components/ui/HeroGeometric.jsx"));
 
-const API_BASE = import.meta.env.VITE_SIGNALING_URL || "http://localhost:3001";
+const API_BASE = import.meta.env.VITE_SIGNALING_URL || "https://shadowroom.onrender.com";
 const SESSION_KEY = "shadowroom-session";
 
 function loadSession() {
@@ -1011,7 +1012,7 @@ export function ShadowRoomApp() {
         <div className="logo logo-left-corner">
           <div className="logo-icon">
             <img
-              src="/android-chrome-512x512.png"
+              src={logo}
               alt="ShadowRoom Logo"
               className="logo-mark"
             />
@@ -1184,7 +1185,7 @@ export function ShadowRoomApp() {
       <header className="chat-header">
         <div className="chat-room-info">
           <div className="room-avatar">
-            <img src="/android-chrome-512x512.png" alt="ShadowRoom Logo" className="logo-mark" />
+            <img src={logo} alt="ShadowRoom Logo" className="logo-mark" />
           </div>
           <div className="room-details">
             <h3>ShadowRoom</h3>

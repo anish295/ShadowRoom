@@ -18,6 +18,5 @@ services:
       # Optional: override port (default: 3001)
       # - key: PORT
       #   value: 3001
-      # Optional: set CLIENT_ORIGIN for CORS (default: http://localhost:3000)
-      # - key: CLIENT_ORIGIN
-      #   value: http://localhost:3000
+      - key: CLIENT_ORIGIN
+        value: https://shadowroom-chat.netlify.app
