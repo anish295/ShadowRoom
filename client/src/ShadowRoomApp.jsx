@@ -7,7 +7,7 @@ import React, {
   lazy,
   Suspense,
 } from "react";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, Smile } from "lucide-react";
 import { io } from "socket.io-client";
 import axios from "axios";
 import { sendFileP2P, setupFileReceiver, triggerDownload } from "./services/fileTransfer.js";
@@ -18,6 +18,10 @@ const HeroGeometric = lazy(() => import("./components/ui/HeroGeometric.jsx"));
 
 const API_BASE = import.meta.env.VITE_SIGNALING_URL || "https://shadowroom.onrender.com";
 const SESSION_KEY = "shadowroom-session";
+const QUICK_EMOJIS = [
+  "😀", "😁", "😂", "😎", "🤝", "🔥", "🚀", "✅",
+  "💬", "📎", "🎯", "🛡️", "⚡", "👀", "👍", "🙏",
+];
 
 function loadSession() {
   try {
@@ -163,9 +167,8 @@ export function ShadowRoomApp() {
   // Reply / tagging state
   const [replyingTo, setReplyingTo] = useState(null);
 
-  // User-join detection for system notifications
-  const prevUsersRef = useRef([]);
-  const isFirstUsersUpdate = useRef(true);
+  // User-join detection uses a previous socketId snapshot to prevent duplicate notices.
+  const prevUserSocketIdsRef = useRef(new Set());
   const currentViewRef = useRef(currentView);
   currentViewRef.current = currentView;
   const sessionDataRef = useRef(sessionData);
@@ -173,6 +176,7 @@ export function ShadowRoomApp() {
 
   const messagesEndRef = useRef(null);
   const messageInputRef = useRef(null);
+  const emojiPickerRef = useRef(null);
 
   const socket = useMemo(
     () =>
@@ -196,6 +200,7 @@ export function ShadowRoomApp() {
     [],
   );
   const [titleIndex, setTitleIndex] = useState(0);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
 
   // ==================== HELPERS ====================
   const showToast = useCallback((title, message, type = "success") => {
@@ -317,32 +322,28 @@ export function ShadowRoomApp() {
       ]);
     });
 
-    // Users list updates + join detection (done here, not in useEffect, to avoid closure/batching races)
+    // Users list updates + join detection by socketId diff to avoid join-message spam.
     socket.on("users-updated", (users) => {
-      // --- join detection ---
-      if (currentViewRef.current === "chat" && users.length > 0) {
-        if (isFirstUsersUpdate.current) {
-          isFirstUsersUpdate.current = false;
-          prevUsersRef.current = users;
-        } else {
-          const newJoiners = users.filter(
-            (u) => !prevUsersRef.current.some((p) => p.socketId === u.socketId),
-          );
-          for (const u of newJoiners) {
-            if (u.userName === sessionDataRef.current?.userName) continue;
-            setMessages((prev) => [
-              ...prev,
-              {
-                type: "system",
-                text: `${u.userName} joined the room.`,
-                ts: Date.now(),
-                msgId: crypto.randomUUID(),
-              },
-            ]);
-          }
-          prevUsersRef.current = users;
+      const prevIds = prevUserSocketIdsRef.current;
+      const nextIds = new Set(users.map((u) => u.socketId).filter(Boolean));
+
+      if (currentViewRef.current === "chat" && prevIds.size > 0 && users.length > 0) {
+        const newJoiners = users.filter((u) => u.socketId && !prevIds.has(u.socketId));
+        for (const u of newJoiners) {
+          if (u.userName === sessionDataRef.current?.userName) continue;
+          setMessages((prev) => [
+            ...prev,
+            {
+              type: "system",
+              text: `${u.userName} joined the room.`,
+              ts: Date.now(),
+              msgId: crypto.randomUUID(),
+            },
+          ]);
         }
       }
+
+      prevUserSocketIdsRef.current = nextIds;
       setConnectedUsers(users);
     });
 
@@ -420,6 +421,29 @@ export function ShadowRoomApp() {
 
   // (Join detection is handled directly inside the socket "users-updated" handler above)
 
+  // Close emoji picker when clicking outside or pressing Escape.
+  useEffect(() => {
+    const onPointerDown = (event) => {
+      if (!emojiPickerRef.current) return;
+      if (!emojiPickerRef.current.contains(event.target)) {
+        setEmojiPickerOpen(false);
+      }
+    };
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setEmojiPickerOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
+
   // ==================== TYPING INDICATOR ====================
   const handleTyping = useCallback(() => {
     if (!sessionData?.roomCode) return;
@@ -465,9 +489,8 @@ export function ShadowRoomApp() {
       window.history.replaceState(null, "", `/?roomCode=${code}`);
       setCreateModalOpen(false);
       setCurrentView("chat");
-      // Reset join-tracker so existing users don't fire system messages
-      isFirstUsersUpdate.current = true;
-      prevUsersRef.current = [];
+      // Reset join tracker on room lifecycle transitions.
+      prevUserSocketIdsRef.current = new Set();
       setMessages([{
         type: "system",
         text: "You created this room.",
@@ -512,8 +535,7 @@ export function ShadowRoomApp() {
       window.history.replaceState(null, "", `/?roomCode=${roomCodeInput.trim().toUpperCase()}`);
       setJoinModalOpen(false);
       setCurrentView("chat");
-      isFirstUsersUpdate.current = true;
-      prevUsersRef.current = [];
+      prevUserSocketIdsRef.current = new Set();
       setMessages([{
         type: "system",
         text: "You joined this room.",
@@ -836,6 +858,37 @@ export function ShadowRoomApp() {
     }
   }, [handleFileShare, sessionData?.roomCode]);
 
+  // Global paste handler scoped to message input focus.
+  useEffect(() => {
+    const onPaste = (event) => {
+      if (currentViewRef.current !== "chat") return;
+      if (document.activeElement !== messageInputRef.current) return;
+
+      const clipboardItems = Array.from(event.clipboardData?.items || []);
+      const pastedFiles = clipboardItems
+        .filter((item) => item.kind === "file")
+        .map((item) => item.getAsFile())
+        .filter(Boolean);
+
+      if (!pastedFiles.length) return;
+
+      event.preventDefault();
+      showToast("File Detected", `Detected ${pastedFiles.length} pasted file${pastedFiles.length > 1 ? "s" : ""}.`, "info");
+      handleFilesShare(pastedFiles);
+    };
+
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [handleFilesShare, showToast]);
+
+  const handleEmojiSelect = useCallback((emoji) => {
+    setMessageText((prev) => `${prev}${emoji}`);
+    setEmojiPickerOpen(false);
+    requestAnimationFrame(() => {
+      messageInputRef.current?.focus();
+    });
+  }, []);
+
   const handleLeaveRoom = () => {
     socket.emit("leave-room");
     setMessages([]);
@@ -845,6 +898,7 @@ export function ShadowRoomApp() {
     localStorage.removeItem(SESSION_KEY);
     window.history.replaceState(null, "", "/");
     setCurrentView("auth");
+    prevUserSocketIdsRef.current = new Set();
     setLeaveModalOpen(false);
     showToast("Left Room", "You have left the room", "info");
   };
@@ -1471,13 +1525,14 @@ export function ShadowRoomApp() {
                         <button
                           className="reply-btn"
                           title="Reply"
-                          onClick={() =>
+                          onClick={() => {
                             setReplyingTo({
                               msgId: m.msgId,
                               userName: m.self ? "You" : m.userName || "Anon",
                               snippet: (m.text || "").slice(0, 120),
-                            })
-                          }
+                            });
+                            messageInputRef.current?.focus();
+                          }}
                         >
                           <i className="fas fa-reply" />
                         </button>
@@ -1622,7 +1677,10 @@ export function ShadowRoomApp() {
                 </div>
                 <button
                   className="reply-preview-close"
-                  onClick={() => setReplyingTo(null)}
+                  onClick={() => {
+                    setReplyingTo(null);
+                    messageInputRef.current?.focus();
+                  }}
                   title="Cancel reply"
                 >
                   <i className="fas fa-times" />
@@ -1631,6 +1689,33 @@ export function ShadowRoomApp() {
             )}
             <form onSubmit={handleSendMessage} className="chat-input-container">
               <div className="input-actions">
+                <div className="emoji-picker-wrap" ref={emojiPickerRef}>
+                  <button
+                    type="button"
+                    className="input-btn emoji-trigger"
+                    onClick={() => setEmojiPickerOpen((prev) => !prev)}
+                    title="Emoji"
+                  >
+                    <Smile size={18} />
+                  </button>
+                  {emojiPickerOpen && (
+                    <div className="emoji-picker-panel" role="dialog" aria-label="Emoji picker">
+                      <div className="emoji-picker-header">Stealth Emoji Console</div>
+                      <div className="emoji-grid">
+                        {QUICK_EMOJIS.map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            className="emoji-cell"
+                            onClick={() => handleEmojiSelect(emoji)}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
                   className="input-btn"
@@ -1643,7 +1728,7 @@ export function ShadowRoomApp() {
               <div className="message-input-wrapper">
                 <input
                   ref={messageInputRef}
-                  className="message-input"
+                  className={`message-input ${replyingTo ? "border-[#F7D569] ring-2 ring-[#F7D569]/35" : ""}`}
                   placeholder="Type your message..."
                   value={messageText}
                   onChange={(e) => {

@@ -1010,23 +1010,27 @@ a {
 
 .system-message {
   text-align: center;
-  padding: 1rem;
-  margin: 1rem 0;
+  padding: 0.4rem 0;
+  margin: 0.45rem 0;
 }
 
 .system-message-content {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  background: rgba(107, 122, 153, 0.1);
-  padding: 0.75rem 1.25rem;
-  border-radius: 50px;
-  font-size: 0.9rem;
-  color: var(--text-muted);
+  gap: 0.45rem;
+  background: transparent;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0;
+  font-size: 0.75rem;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .system-message-content i {
-  color: var(--text-muted);
+  color: #64748b;
+  font-size: 0.7rem;
 }
 
 .message {
@@ -1458,6 +1462,66 @@ a {
 .input-actions {
   display: flex;
   gap: 0.5rem;
+  position: relative;
+}
+
+.emoji-picker-wrap {
+  position: relative;
+}
+
+.emoji-trigger {
+  color: var(--accent);
+}
+
+.emoji-picker-panel {
+  position: absolute;
+  bottom: calc(100% + 0.6rem);
+  left: 0;
+  width: 260px;
+  background: #0F111D;
+  border: 2px solid #0F111D;
+  border-radius: 0;
+  padding: 0.7rem;
+  box-shadow: 4px 4px 0px 0px #F7D569;
+  z-index: 70;
+}
+
+.emoji-picker-header {
+  color: #F7D569;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.emoji-cell {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: #161b2c;
+  color: #e2e8f0;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.emoji-cell:hover,
+.emoji-cell:focus {
+  transform: translate(-1px, -1px);
+  border-color: #F7D569;
+  background: #1d2236;
+  outline: none;
 }
 
 .input-btn {
