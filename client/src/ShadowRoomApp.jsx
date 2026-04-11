@@ -178,6 +178,7 @@ export function ShadowRoomApp() {
   const messagesEndRef = useRef(null);
   const messageInputRef = useRef(null);
   const emojiPickerRef = useRef(null);
+  const modalSendBtnRef = useRef(null);
 
   const socket = useMemo(
     () =>
@@ -444,6 +445,12 @@ export function ShadowRoomApp() {
       document.removeEventListener("keydown", onKeyDown);
     };
   }, []);
+
+  useEffect(() => {
+    if (fileModalOpen) {
+      modalSendBtnRef.current?.focus();
+    }
+  }, [fileModalOpen]);
 
   // ==================== TYPING INDICATOR ====================
   const handleTyping = useCallback(() => {
@@ -858,29 +865,6 @@ export function ShadowRoomApp() {
       handleFileShare(file);
     }
   }, [handleFileShare, sessionData?.roomCode]);
-
-  // Global paste handler scoped to message input focus.
-  useEffect(() => {
-    const onPaste = (event) => {
-      if (currentViewRef.current !== "chat") return;
-      if (document.activeElement !== messageInputRef.current) return;
-
-      const clipboardItems = Array.from(event.clipboardData?.items || []);
-      const pastedFiles = clipboardItems
-        .filter((item) => item.kind === "file")
-        .map((item) => item.getAsFile())
-        .filter(Boolean);
-
-      if (!pastedFiles.length) return;
-
-      event.preventDefault();
-      showToast("File Detected", `Detected ${pastedFiles.length} pasted file${pastedFiles.length > 1 ? "s" : ""}.`, "info");
-      handleFilesShare(pastedFiles);
-    };
-
-    window.addEventListener("paste", onPaste);
-    return () => window.removeEventListener("paste", onPaste);
-  }, [handleFilesShare, showToast]);
 
   const handleEmojiClick = useCallback((emoji) => {
     setMessageText((prev) => `${prev}${emoji}`);
@@ -2030,6 +2014,7 @@ export function ShadowRoomApp() {
               Cancel
             </button>
             <button
+              ref={modalSendBtnRef}
               className="btn btn-primary"
               disabled={selectedFiles.length === 0}
               onClick={() => handleFilesShare(selectedFiles)}
