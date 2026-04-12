@@ -1,10 +1,41 @@
 // Per-room user tracking: roomCode -> Map<socketId, { socketId, userName }>
 const roomUsers = new Map();
 
-function getRoomUsersList(roomCode) {
+function getRoomUsersList(roomCode, roomsByCode) {
   const users = roomUsers.get(roomCode);
   if (!users) return [];
-  return Array.from(users.values());
+
+  const adminSocketId = roomsByCode?.get(roomCode)?.adminSocketId;
+  return Array.from(users.values()).map((user) => ({
+    ...user,
+    isAdmin: Boolean(adminSocketId && user.socketId === adminSocketId),
+  }));
+}
+
+function getNextAdminSocketId(roomCode) {
+  const users = roomUsers.get(roomCode);
+  if (!users || users.size === 0) return null;
+  return users.values().next().value?.socketId || null;
+}
+
+function emitUsersUpdated(io, roomCode, roomsByCode) {
+  io.to(roomCode).emit("users-updated", getRoomUsersList(roomCode, roomsByCode));
+}
+
+function setAdminAndBroadcast(io, roomCode, roomsByCode, adminSocketId) {
+  if (!roomsByCode || !roomsByCode.has(roomCode)) return;
+  const room = roomsByCode.get(roomCode);
+  room.adminSocketId = adminSocketId || null;
+
+  const adminName = adminSocketId
+    ? roomUsers.get(roomCode)?.get(adminSocketId)?.userName || null
+    : null;
+
+  io.to(roomCode).emit("admin-changed", {
+    roomCode,
+    adminId: room.adminSocketId,
+    adminName,
+  });
 }
 
 function removeRoomIfEmpty(roomCode, roomsByCode) {
@@ -89,8 +120,16 @@ export function registerSocketHandlers(io, { pinStore, logger, roomsByCode }) {
       }
       roomUsers.get(code).set(socket.id, { socketId: socket.id, userName });
 
+      const room = roomsByCode?.get(code);
+      if (room && !room.adminSocketId) {
+        // Prefer the original creator name, but always ensure there is exactly one admin.
+        if (userName === room.adminName || roomUsers.get(code).size === 1) {
+          setAdminAndBroadcast(io, code, roomsByCode, socket.id);
+        }
+      }
+
       // Broadcast updated user list to entire room
-      io.to(code).emit("users-updated", getRoomUsersList(code));
+      emitUsersUpdated(io, code, roomsByCode);
       logger.info("user joined chat room", { code, userName, socketId: socket.id });
     });
 
@@ -104,7 +143,12 @@ export function registerSocketHandlers(io, { pinStore, logger, roomsByCode }) {
         if (users.size === 0) {
           removeRoomIfEmpty(code, roomsByCode);
         } else {
-          io.to(code).emit("users-updated", getRoomUsersList(code));
+          const room = roomsByCode?.get(code);
+          if (room?.adminSocketId === socket.id) {
+            const nextAdminId = getNextAdminSocketId(code);
+            setAdminAndBroadcast(io, code, roomsByCode, nextAdminId);
+          }
+          emitUsersUpdated(io, code, roomsByCode);
         }
       }
 
@@ -208,18 +252,57 @@ export function registerSocketHandlers(io, { pinStore, logger, roomsByCode }) {
         text: text.slice(0, 10_000),
         roomCode: code,
         userName: String(userName || "Anon").slice(0, 50),
+        userId: socket.id,
         ts: ts || Date.now(),
         replyTo:
           replyTo && typeof replyTo === "object"
             ? {
-                msgId: String(replyTo.msgId || "").slice(0, 64),
-                userName: String(replyTo.userName || "").slice(0, 50),
-                snippet: String(replyTo.snippet || "").slice(0, 200),
-              }
+              msgId: String(replyTo.msgId || "").slice(0, 64),
+              userId: String(replyTo.userId || "").slice(0, 64),
+              userName: String(replyTo.userName || "").slice(0, 50),
+              snippet: String(replyTo.snippet || "").slice(0, 200),
+            }
             : undefined,
       };
       // Broadcast to everyone EXCEPT the sender
       socket.to(code).emit("receive-message", enriched);
+    });
+
+    socket.on("kick-user", ({ roomCode, targetSocketId } = {}) => {
+      if (!roomCode || !targetSocketId) return;
+      const code = String(roomCode).toUpperCase();
+      const room = roomsByCode?.get(code);
+      if (!room) return;
+      if (room.adminSocketId !== socket.id) return;
+      if (targetSocketId === socket.id) return;
+
+      const users = roomUsers.get(code);
+      if (!users || !users.has(targetSocketId)) return;
+
+      const kickedUser = users.get(targetSocketId);
+      users.delete(targetSocketId);
+
+      const targetSocket = io.sockets.sockets.get(targetSocketId);
+      if (targetSocket) {
+        targetSocket.leave(code);
+        targetSocket.data.chatRoom = null;
+        targetSocket.data.chatUserName = null;
+        targetSocket.emit("kicked", {
+          roomCode: code,
+          kickedBy: socket.data.chatUserName || "Admin",
+        });
+      }
+
+      io.to(code).emit("system-message", {
+        text: `${kickedUser.userName} was removed by admin.`,
+        ts: Date.now(),
+      });
+      emitUsersUpdated(io, code, roomsByCode);
+      logger.info("user kicked from room", {
+        code,
+        bySocketId: socket.id,
+        targetSocketId,
+      });
     });
 
     // ==================== DISCONNECT ====================
@@ -236,7 +319,12 @@ export function registerSocketHandlers(io, { pinStore, logger, roomsByCode }) {
           if (users.size === 0) {
             removeRoomIfEmpty(chatRoom, roomsByCode);
           } else {
-            io.to(chatRoom).emit("users-updated", getRoomUsersList(chatRoom));
+            const room = roomsByCode?.get(chatRoom);
+            if (room?.adminSocketId === socket.id) {
+              const nextAdminId = getNextAdminSocketId(chatRoom);
+              setAdminAndBroadcast(io, chatRoom, roomsByCode, nextAdminId);
+            }
+            emitUsersUpdated(io, chatRoom, roomsByCode);
           }
         }
       }

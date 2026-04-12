@@ -157,7 +157,11 @@ export function ShadowRoomApp() {
   });
   const [mobileActionsVisible, setMobileActionsVisible] = useState(false);
   const [connectedUsers, setConnectedUsers] = useState([]);
+  const [adminId, setAdminId] = useState(null);
   const [typingUsers, setTypingUsers] = useState([]);
+  const [isShadowLocked, setIsShadowLocked] = useState(false);
+  const [showGoToBottom, setShowGoToBottom] = useState(false);
+  const [unreadWhileScrolled, setUnreadWhileScrolled] = useState(0);
 
   // Toasts
   const [toasts, setToasts] = useState([]);
@@ -178,6 +182,9 @@ export function ShadowRoomApp() {
   sessionDataRef.current = sessionData;
 
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const isNearBottomRef = useRef(true);
+  const prevMessageCountRef = useRef(0);
   const messageInputRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const modalSendBtnRef = useRef(null);
@@ -243,6 +250,9 @@ export function ShadowRoomApp() {
   };
 
   const scrollToBottom = useCallback(() => {
+    setUnreadWhileScrolled(0);
+    setShowGoToBottom(false);
+    isNearBottomRef.current = true;
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
@@ -260,6 +270,33 @@ export function ShadowRoomApp() {
   // Apply theme on mount
   useEffect(() => {
     document.documentElement.classList.toggle("light", !isDarkMode);
+  }, []);
+
+  useEffect(() => {
+    const lockUi = () => setIsShadowLocked(true);
+    const unlockUi = () => {
+      if (document.visibilityState === "visible" && document.hasFocus()) {
+        setIsShadowLocked(false);
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") {
+        lockUi();
+      } else {
+        unlockUi();
+      }
+    };
+
+    window.addEventListener("blur", lockUi);
+    window.addEventListener("focus", unlockUi);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("blur", lockUi);
+      window.removeEventListener("focus", unlockUi);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, []);
 
   // On first load, allow direct join via roomCode query and keep auth if no session.
@@ -327,6 +364,19 @@ export function ShadowRoomApp() {
       ]);
     });
 
+    socket.on("system-message", ({ text, ts }) => {
+      if (!text) return;
+      setMessages((prev) => [
+        ...prev,
+        {
+          type: "system",
+          text,
+          ts: ts || Date.now(),
+          msgId: crypto.randomUUID(),
+        },
+      ]);
+    });
+
     // Users list updates + join detection by socketId diff to avoid join-message spam.
     socket.on("users-updated", (users) => {
       const prevIds = prevUserSocketIdsRef.current;
@@ -350,6 +400,48 @@ export function ShadowRoomApp() {
 
       prevUserSocketIdsRef.current = nextIds;
       setConnectedUsers(users);
+
+      const activeAdmin = users.find((u) => u.isAdmin);
+      setAdminId(activeAdmin?.socketId || null);
+    });
+
+    socket.on("admin-changed", ({ adminId: nextAdminId, adminName } = {}) => {
+      const normalizedAdminId = nextAdminId || null;
+      setAdminId((prevAdminId) => {
+        if (normalizedAdminId === socket.id && prevAdminId !== normalizedAdminId) {
+          showToast("Admin Baton", "You are now the room admin.", "info");
+        }
+        return normalizedAdminId;
+      });
+
+      setSessionData((prev) => {
+        if (!prev) return prev;
+        const next = {
+          ...prev,
+          role: normalizedAdminId === socket.id ? "admin" : "participant",
+        };
+        saveSession(next);
+        return next;
+      });
+
+      if (adminName && normalizedAdminId !== socket.id) {
+        showToast("Admin Changed", `${adminName} is now the admin.`, "info");
+      }
+    });
+
+    socket.on("kicked", ({ kickedBy } = {}) => {
+      setMessages([]);
+      setConnectedUsers([]);
+      setTypingUsers([]);
+      setAdminId(null);
+      setUnreadWhileScrolled(0);
+      setShowGoToBottom(false);
+      setSessionData(null);
+      localStorage.removeItem(SESSION_KEY);
+      window.history.replaceState(null, "", "/");
+      setCurrentView("auth");
+      prevUserSocketIdsRef.current = new Set();
+      showToast("Removed", `You were removed by ${kickedBy || "the admin"}.`, "error");
     });
 
     // Server-side room join errors (e.g., room deleted after link created)
@@ -376,13 +468,16 @@ export function ShadowRoomApp() {
       socket.off("connect");
       socket.off("disconnect");
       socket.off("receive-message");
+      socket.off("system-message");
       socket.off("users-updated");
+      socket.off("admin-changed");
+      socket.off("kicked");
       socket.off("join-room-error");
       socket.off("user-typing");
       socket.off("user-stop-typing");
       socket.disconnect();
     };
-  }, [socket]);
+  }, [socket, showToast]);
 
   // Join the socket room when entering chat view
   useEffect(() => {
@@ -419,9 +514,54 @@ export function ShadowRoomApp() {
     setCurrentView("chat");
   }, []);
 
-  // Scroll to bottom on new messages
+  // Smart autoscroll: only pin to bottom if the viewer is already near it.
   useEffect(() => {
-    scrollToBottom();
+    const el = messagesContainerRef.current;
+    if (!el) return;
+
+    const onScroll = () => {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      const nearBottom = distanceFromBottom <= 100;
+      isNearBottomRef.current = nearBottom;
+      if (nearBottom) {
+        setUnreadWhileScrolled(0);
+        setShowGoToBottom(false);
+      }
+    };
+
+    onScroll();
+    el.addEventListener("scroll", onScroll);
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [currentView]);
+
+  useEffect(() => {
+    const currentCount = messages.length;
+    const hadNewMessage = currentCount > prevMessageCountRef.current;
+    const wasReset = currentCount === 0 && prevMessageCountRef.current > 0;
+
+    if (wasReset) {
+      prevMessageCountRef.current = 0;
+      setUnreadWhileScrolled(0);
+      setShowGoToBottom(false);
+      return;
+    }
+
+    if (!hadNewMessage) {
+      prevMessageCountRef.current = currentCount;
+      return;
+    }
+
+    const latest = messages[currentCount - 1];
+    const shouldForceScroll = Boolean(latest?.self) || prevMessageCountRef.current === 0;
+
+    if (isNearBottomRef.current || shouldForceScroll) {
+      scrollToBottom();
+    } else {
+      setShowGoToBottom(true);
+      setUnreadWhileScrolled((prev) => prev + 1);
+    }
+
+    prevMessageCountRef.current = currentCount;
   }, [messages, scrollToBottom]);
 
   // (Join detection is handled directly inside the socket "users-updated" handler above)
@@ -587,6 +727,7 @@ export function ShadowRoomApp() {
       text: messageText.trim(),
       roomCode: sessionData.roomCode,
       userName: sessionData.userName,
+      userId: socket.id,
       ts: Date.now(),
       ...(replyingTo ? { replyTo: replyingTo } : {}),
     };
@@ -872,10 +1013,17 @@ export function ShadowRoomApp() {
   const handleEmojiClick = useCallback((emoji) => {
     setMessageText((prev) => `${prev}${emoji}`);
     setEmojiPickerOpen(false);
-    requestAnimationFrame(() => {
-      messageInputRef.current?.focus();
-    });
+    messageInputRef.current?.focus();
   }, []);
+
+  const handleKick = useCallback((targetSocketId) => {
+    if (!sessionData?.roomCode || !targetSocketId) return;
+    if (adminId !== socket.id) return;
+    socket.emit("kick-user", {
+      roomCode: sessionData.roomCode,
+      targetSocketId,
+    });
+  }, [adminId, sessionData?.roomCode, socket]);
 
   const handlePaste = useCallback((event) => {
     const clipboardItems = Array.from(event.clipboardData?.items || []);
@@ -901,6 +1049,9 @@ export function ShadowRoomApp() {
     setMessages([]);
     setConnectedUsers([]);
     setTypingUsers([]);
+    setAdminId(null);
+    setUnreadWhileScrolled(0);
+    setShowGoToBottom(false);
     setSessionData(null);
     localStorage.removeItem(SESSION_KEY);
     window.history.replaceState(null, "", "/");
@@ -909,6 +1060,8 @@ export function ShadowRoomApp() {
     setLeaveModalOpen(false);
     showToast("Left Room", "You have left the room", "info");
   };
+
+  const currentUserIsAdmin = adminId === socket.id;
 
   const handleCopyRoomCode = () => {
     if (!sessionData?.roomCode) return;
@@ -1334,10 +1487,9 @@ export function ShadowRoomApp() {
                 )}
               </button>
               <button
-                className="theme-toggle"
+                className="header-btn"
                 onClick={toggleTheme}
                 title="Toggle Theme"
-                style={{ width: 45, height: 45 }}
               >
                 <motion.span
                   className="theme-icon-wrap"
@@ -1424,7 +1576,7 @@ export function ShadowRoomApp() {
                 <div className="user-info">
                   <div className="user-name">
                     {user.userName}
-                    {user.userName === sessionData?.userName && (
+                    {user.socketId === socket.id && (
                       <span
                         className="user-badge"
                         style={{ marginLeft: "0.5rem" }}
@@ -1453,10 +1605,17 @@ export function ShadowRoomApp() {
                     )}
                   </div>
                 </div>
-                {user.userName === sessionData?.userName &&
-                  sessionData?.role === "admin" && (
-                    <span className="user-badge">Admin</span>
-                  )}
+                {user.isAdmin && <span className="user-badge">Admin</span>}
+                {currentUserIsAdmin && user.socketId !== socket.id && !user.isAdmin && (
+                  <button
+                    type="button"
+                    className="kick-user-btn"
+                    title={`Remove ${user.userName}`}
+                    onClick={() => handleKick(user.socketId)}
+                  >
+                    <i className="fas fa-user-slash" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -1480,7 +1639,7 @@ export function ShadowRoomApp() {
 
         <div className="chat-messages-area">
           {/* Messages */}
-          <div className="messages-container custom-scrollbar">
+          <div ref={messagesContainerRef} className="messages-container custom-scrollbar">
             {/* System welcome message */}
             <div className="system-message">
               <div className="system-message-content">
@@ -1545,7 +1704,10 @@ export function ShadowRoomApp() {
                           onClick={() => {
                             setReplyingTo({
                               msgId: m.msgId,
-                              userName: m.self ? "You" : m.userName || "Anon",
+                              userId: m.userId || (m.self ? socket.id : null),
+                              userName: m.self
+                                ? sessionData?.userName || "You"
+                                : m.userName || "Anon",
                               snippet: (m.text || "").slice(0, 120),
                             });
                             messageInputRef.current?.focus();
@@ -1584,7 +1746,7 @@ export function ShadowRoomApp() {
                             }}
                           >
                             <span className="reply-quote-author">
-                              {m.replyTo.userName}
+                              {m.replyTo.userId === socket.id ? "You" : m.replyTo.userName}
                             </span>
                             <span className="reply-quote-text">
                               {m.replyTo.snippet}
@@ -1600,6 +1762,23 @@ export function ShadowRoomApp() {
             })}
             <div ref={messagesEndRef} />
           </div>
+
+          {showGoToBottom && (
+            <button
+              type="button"
+              className="go-bottom-btn"
+              onClick={scrollToBottom}
+              title="Go to latest message"
+            >
+              <i className="fas fa-arrow-down"></i>
+              <span>Go to Bottom</span>
+              {unreadWhileScrolled > 0 && (
+                <span className="go-bottom-indicator">
+                  {unreadWhileScrolled > 99 ? "99+" : unreadWhileScrolled}
+                </span>
+              )}
+            </button>
+          )}
 
           {/* Typing indicator above input */}
           {typingUsers.length > 0 && (
@@ -1686,7 +1865,7 @@ export function ShadowRoomApp() {
                     style={{ color: "var(--accent)", flexShrink: 0 }}
                   />
                   <span className="reply-preview-author">
-                    Replying to {replyingTo.userName}
+                    Replying to {replyingTo.userId === socket.id ? "You" : replyingTo.userName}
                   </span>
                   <span className="reply-preview-snippet">
                     · {replyingTo.snippet}
@@ -1751,7 +1930,7 @@ export function ShadowRoomApp() {
                   ref={messageInputRef}
                   onPaste={handlePaste}
                   className={`message-input bg-slate-900/40 backdrop-blur-md border-2 border-transparent transition-all duration-300 focus:border-[#F7D569] focus:shadow-[0_0_15px_rgba(247,213,105,0.3)] focus:outline-none ${replyingTo ? "border-[#F7D569] shadow-[0_0_15px_rgba(247,213,105,0.3)]" : ""}`}
-                  placeholder={replyingTo ? `Replying to ${replyingTo.userName}...` : "Type a secure message..."}
+                  placeholder={replyingTo ? `Replying to ${replyingTo.userId === socket.id ? "You" : replyingTo.userName}...` : "Type a secure message..."}
                   value={messageText}
                   onChange={(e) => {
                     setMessageText(e.target.value);
@@ -2078,8 +2257,9 @@ export function ShadowRoomApp() {
 
   return (
     <>
-      {currentView === "auth" ? renderAuthView() : renderChatView()}
-      {renderModals()}
+      <div className={isShadowLocked ? "shadow-app locked" : "shadow-app"}>
+        {currentView === "auth" ? renderAuthView() : renderChatView()}
+        {renderModals()}
 
       {/* ─── Incoming File Offer Accept/Decline ─── */}
       {pendingOffers.length > 0 && (
@@ -2214,7 +2394,17 @@ export function ShadowRoomApp() {
         </div>
       )}
 
-      <ToastContainer toasts={toasts} onRemove={removeToast} />
+        <ToastContainer toasts={toasts} onRemove={removeToast} />
+      </div>
+
+      {isShadowLocked && (
+        <div className="shadow-lock-overlay" role="alert" aria-live="assertive">
+          <div className="shadow-lock-card">
+            <div className="shadow-lock-title">SHADOW_LOCKED</div>
+            <div className="shadow-lock-subtitle">Window focus lost. Return to this tab to continue.</div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
