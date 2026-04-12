@@ -207,9 +207,9 @@ a {
 .theme-toggle {
   width: 45px;
   height: 45px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 2px solid var(--border);
-  color: var(--text-primary);
+  background: #0F111D;
+  border: 2px solid #F7D569;
+  color: #F7D569;
   border-radius: 0;
   cursor: pointer;
   font-size: 1.1rem;
@@ -226,21 +226,13 @@ a {
 
 .theme-icon-wrap {
   display: flex;
-  transition: transform 0.4s cubic-bezier(0.23, 0.86, 0.39, 0.96);
+  transform: none;
 }
 
-.theme-icon-wrap.is-dark,
-.theme-icon-wrap.is-light {
-  transition: transform 0.4s cubic-bezier(0.23, 0.86, 0.39, 0.96);
-}
-
-.theme-icon-wrap.is-dark,
-.theme-toggle:hover .theme-icon-wrap.is-light {
-  transform: rotate(180deg);
-}
-
-.theme-toggle:hover .theme-icon-wrap.is-dark {
-  transform: rotate(360deg);
+.light .theme-toggle {
+  background: #FFFFFF;
+  border-color: #020617;
+  color: #020617;
 }
 
 /* ==================== BUTTONS ==================== */
@@ -625,7 +617,7 @@ a {
 }
 
 .modal {
-  background: rgba(255, 255, 255, 0.05);
+  background: #0F111D;
   backdrop-filter: blur(40px);
   border-radius: 0;
   width: 100%;
@@ -634,8 +626,14 @@ a {
   overflow-y: auto;
   border: 2px solid #0F111D;
   box-shadow: 4px 4px 0px #F7D569;
+  color: #FFFFFF;
   transform: scale(0.9) translateY(20px);
   transition: all 0.3s ease;
+}
+
+.light .modal {
+  background: #FFFFFF;
+  color: #0F111D;
 }
 
 .modal-overlay.active .modal {
@@ -656,7 +654,7 @@ a {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  color: var(--text-primary);
+  color: inherit;
 }
 
 .modal-title i {
@@ -711,7 +709,7 @@ a {
   gap: 0.5rem;
   margin-bottom: 0.75rem;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: inherit;
   font-size: 0.95rem;
 }
 
@@ -723,14 +721,19 @@ a {
 .form-input {
   width: 100%;
   padding: 1rem 1.25rem;
-  background: rgba(255, 255, 255, 0.05);
+  background: #1A2234;
   border: 2px solid #0F111D;
   border-radius: 0;
   box-shadow: 4px 4px 0px #F7D569;
-  color: var(--text-primary);
+  color: inherit;
   font-size: 1rem;
   font-family: inherit;
   transition: all 0.3s ease;
+}
+
+.light .modal .form-input {
+  background: #F1F5F9;
+  color: #0F111D;
 }
 
 .form-input:focus {
@@ -2003,11 +2006,12 @@ a {
   font-size: 1.5rem;
   font-weight: 700;
   margin-bottom: 0.75rem;
-  color: var(--text-primary);
+  color: inherit;
 }
 
 .confirm-text {
-  color: var(--text-secondary);
+  color: inherit;
+  opacity: 0.88;
   margin-bottom: 2rem;
 }
 

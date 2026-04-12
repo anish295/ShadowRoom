@@ -7,6 +7,7 @@ import React, {
   lazy,
   Suspense,
 } from "react";
+import { motion } from "framer-motion";
 import { Moon, Sun, Smile } from "lucide-react";
 import { io } from "socket.io-client";
 import axios from "axios";
@@ -136,6 +137,7 @@ export function ShadowRoomApp() {
     const saved = localStorage.getItem("shadowroom-theme");
     return saved !== "light";
   });
+  const [themeFlipDeg, setThemeFlipDeg] = useState(0);
 
   // Modals
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -246,6 +248,7 @@ export function ShadowRoomApp() {
 
   // Theme toggle
   const toggleTheme = useCallback(() => {
+    setThemeFlipDeg((prev) => prev + 180);
     setIsDarkMode((prev) => {
       const next = !prev;
       document.documentElement.classList.toggle("light", !next);
@@ -1083,9 +1086,14 @@ export function ShadowRoomApp() {
             onClick={toggleTheme}
             title="Toggle Theme"
           >
-            <span className={`theme-icon-wrap ${isDarkMode ? "is-dark" : "is-light"}`}>
-              {isDarkMode ? <Moon size={18} /> : <Sun size={18} />}
-            </span>
+            <motion.span
+              className="theme-icon-wrap"
+              animate={{ rotateY: themeFlipDeg }}
+              transition={{ duration: 0.45, ease: "easeInOut" }}
+              style={{ transformStyle: "preserve-3d" }}
+            >
+              {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+            </motion.span>
           </button>
         </div>
       </nav>
@@ -1295,8 +1303,8 @@ export function ShadowRoomApp() {
                       setMobileActionsVisible(false);
                     }}
                   >
-                    <span className={`theme-icon-wrap ${isDarkMode ? "is-dark" : "is-light"}`}>
-                      {isDarkMode ? <Moon size={16} /> : <Sun size={16} />}
+                    <span className="theme-icon-wrap">
+                      {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
                     </span>
                     Theme
                   </button>
@@ -1331,9 +1339,14 @@ export function ShadowRoomApp() {
                 title="Toggle Theme"
                 style={{ width: 45, height: 45 }}
               >
-                <span className={`theme-icon-wrap ${isDarkMode ? "is-dark" : "is-light"}`}>
-                  {isDarkMode ? <Moon size={18} /> : <Sun size={18} />}
-                </span>
+                <motion.span
+                  className="theme-icon-wrap"
+                  animate={{ rotateY: themeFlipDeg }}
+                  transition={{ duration: 0.45, ease: "easeInOut" }}
+                  style={{ transformStyle: "preserve-3d" }}
+                >
+                  {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+                </motion.span>
               </button>
               <button
                 className="header-btn danger"
@@ -2077,9 +2090,11 @@ export function ShadowRoomApp() {
           zIndex: 10000, padding: "1rem",
         }}>
           <div style={{
-            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+            background: isDarkMode ? "#0F111D" : "#FFFFFF",
+            border: "2px solid #0F111D",
             borderRadius: 22, padding: "2rem", maxWidth: 460, width: "100%",
-            boxShadow: "0 28px 70px rgba(0,0,0,0.6)",
+            boxShadow: `4px 4px 0px ${isDarkMode ? "#F7D569" : "#0F111D"}`,
+            color: isDarkMode ? "#FFFFFF" : "#0F111D",
             backdropFilter: "blur(40px)",
           }}>
             {/* Header */}
@@ -2092,11 +2107,17 @@ export function ShadowRoomApp() {
               }}>
                 <i className="fas fa-file-download" />
               </div>
-              <div className="download-list-title">
+              <div
+                className="download-list-title"
+                style={{ color: isDarkMode ? "#FFFFFF" : "#0F111D" }}
+              >
                 Incoming {pendingOffers.length === 1 ? "File" : `${pendingOffers.length} Files`}
               </div>
-              <div className="download-list-subtitle">
-                from <strong style={{ color: "var(--text-secondary)" }}>
+              <div
+                className="download-list-subtitle"
+                style={{ color: isDarkMode ? "#94A3B8" : "#475569" }}
+              >
+                from <strong style={{ color: isDarkMode ? "#94A3B8" : "#475569" }}>
                   {pendingOffers[0]?.senderName}
                 </strong> · select which to download
               </div>
@@ -2111,7 +2132,11 @@ export function ShadowRoomApp() {
               return (
                 <div
                   className="download-list-countdown"
-                  style={{ color: secsLeft <= 5 ? "var(--danger)" : "var(--text-muted)" }}
+                  style={{
+                    color: isDarkMode
+                      ? (secsLeft <= 5 ? "#FB923C" : "#F7C25A")
+                      : (secsLeft <= 5 ? "#EA580C" : "#2563EB"),
+                  }}
                 >
                   <i className="fas fa-clock" style={{ marginRight: "0.3rem" }} />
                   Auto-decline in {secsLeft}s
@@ -2135,7 +2160,10 @@ export function ShadowRoomApp() {
                     <div className="download-list-file-name" title={offer.fileName}>
                       {offer.fileName}
                     </div>
-                    <div className="download-list-file-size">
+                    <div
+                      className="download-list-file-size"
+                      style={{ color: isDarkMode ? "#94A3B8" : "#475569" }}
+                    >
                       {(offer.fileSize / 1024 / 1024).toFixed(2)} MB
                       {offer.fileType && ` · ${offer.fileType.split("/")[1] || offer.fileType}`}
                     </div>
@@ -2147,16 +2175,34 @@ export function ShadowRoomApp() {
             {/* Actions */}
             <div className="download-list-actions">
               <button
-                className="btn btn-secondary"
-                style={{ flex: 1, padding: "0.75rem", borderRadius: 12, fontWeight: 600 }}
+                className="btn"
+                style={{
+                  flex: 1,
+                  padding: "0.75rem",
+                  borderRadius: 12,
+                  fontWeight: 600,
+                  background: isDarkMode ? "transparent" : "#F1F5F9",
+                  color: isDarkMode ? "#FFFFFF" : "#0F172A",
+                  border: "2px solid #0F111D",
+                  boxShadow: `4px 4px 0px ${isDarkMode ? "#F7D569" : "#0F111D"}`,
+                }}
                 onClick={handleDeclineAll}
               >
                 <i className="fas fa-times" style={{ marginRight: "0.4rem" }} />
                 Decline All
               </button>
               <button
-                className="btn btn-primary"
-                style={{ flex: 1, padding: "0.75rem", borderRadius: 12, fontWeight: 600 }}
+                className="btn"
+                style={{
+                  flex: 1,
+                  padding: "0.75rem",
+                  borderRadius: 12,
+                  fontWeight: 600,
+                  background: "#F7D569",
+                  color: "#0F111D",
+                  border: "2px solid #0F111D",
+                  boxShadow: `4px 4px 0px ${isDarkMode ? "#F7D569" : "#0F111D"}`,
+                }}
                 disabled={!pendingOffers.some((o) => o.checked)}
                 onClick={handleDownloadSelected}
               >
