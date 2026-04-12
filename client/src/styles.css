@@ -2615,6 +2615,11 @@ a {
   transition: all 0.2s ease;
 }
 
+.shadow-app {
+  width: 100%;
+  height: 100%;
+}
+
 .shadow-app.locked {
   filter: blur(14px);
   pointer-events: none;
