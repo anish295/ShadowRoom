@@ -45,6 +45,23 @@ const STUN_SERVERS = [
   { urls: "stun:stun3.l.google.com:19302" },
 ];
 
+
+ // Public TURN servers for NAT traversal when STUN alone isn't sufficient
+ const TURN_SERVERS = [
+   {
+     urls: "turn:openrelay.metered.ca:80",
+     username: "openrelayproject",
+     credential: "openrelayproject",
+   },
+   {
+     urls: "turn:openrelay.metered.ca:443",
+     username: "openrelayproject",
+     credential: "openrelayproject",
+   },
+ ];
+
+ // Combine STUN and TURN servers
+ const ICE_SERVERS = [...STUN_SERVERS, ...TURN_SERVERS];
 // ─── Module-level receiver state (survives React StrictMode re-fires) ───
 const _activePeers = new Map();    // transferId -> state (persists across effect re-runs)
 const _pendingOffers = new Map();  // transferId -> offer payload
@@ -179,10 +196,22 @@ export function sendFileP2P(socket, roomCode, userName, file, {
       initiator: true,
       trickle: true,
       allowHalfOpen: true,  // CRITICAL: prevents Duplex stream _onFinish from auto-destroying
-      config: { iceServers: STUN_SERVERS },
+      config: { iceServers: ICE_SERVERS },
+      iceTransportPolicy: "all",
     });
 
-    const peerState = { peer, ackReceived: false, streaming: false };
+     const connectionTimeout = setTimeout(() => {
+       if (!peer.destroyed && (!peer._pc || peer._pc.connectionState !== "connected")) {
+         console.warn(`[P2P Sender] Connection timeout for ${receiverSocketId}, destroying peer`);
+         peerState.timedOut = true;
+         totalReceiversDone++;
+         try { peer.destroy(); } catch { /* */ }
+         peers.delete(receiverSocketId);
+         checkAllDone();
+       }
+     }, 30000);
+
+     const peerState = { peer, ackReceived: false, streaming: false, timedOut: false, connectionTimeout };
     peers.set(receiverSocketId, peerState);
 
     peer.on("signal", (data) => {
@@ -195,8 +224,10 @@ export function sendFileP2P(socket, roomCode, userName, file, {
       }
     });
 
+  console.log(`[P2P Sender] Emitting signal event: transferId=${transferId}, receiverSocketId=${receiverSocketId}, dataType=${data?.type || 'unknown'}`);
     peer.on("connect", () => {
       console.log(`[P2P Sender] DataChannel open to ${receiverSocketId}, waiting for READY signal`);
+      clearTimeout(peerState.connectionTimeout);
     });
 
     peer.on("data", (msg) => {
@@ -204,6 +235,13 @@ export function sendFileP2P(socket, roomCode, userName, file, {
     });
 
     peer.on("error", (err) => {
+               const errorMsg = err?.message || String(err);
+               console.error(`[P2P Sender] Peer error for ${receiverSocketId}:`, errorMsg);
+               console.error(`[P2P Sender] Error ICE state:`, {
+                 iceGatheringState: peer._pc?.iceGatheringState,
+                 iceConnectionState: peer._pc?.iceConnectionState,
+                 connectionState: peer._pc?.connectionState,
+               });
       if (!cancelled && !finished) {
         console.error(`[P2P Sender] Peer error for ${receiverSocketId}:`, err.message);
       }
@@ -414,6 +452,7 @@ export function setupFileReceiver(socket, {
     if (!offer) return;
     _pendingOffers.delete(transferId);
 
+  console.log(`[P2P Receiver] acceptOffer called for transferId=${transferId}, senderSocketId=${offer.senderSocketId}`);
     const { senderSocketId, fileName, fileSize, fileType, senderName } = offer;
 
     // 1. Storage check
@@ -459,12 +498,14 @@ export function setupFileReceiver(socket, {
       initiator: false,
       trickle: true,
       allowHalfOpen: true,  // CRITICAL: prevents Duplex stream _onFinish from auto-destroying
-      config: { iceServers: STUN_SERVERS },
+      config: { iceServers: ICE_SERVERS },
     });
 
+  iceTransportPolicy: "all",
     // Write queue: serialize all incoming data processing
     let writeQueuePromise = Promise.resolve();
 
+  console.log(`[P2P Receiver] Peer created: initiator=false, transferId=${transferId}`);
     const state = {
       peer,
       meta: null,
@@ -481,6 +522,20 @@ export function setupFileReceiver(socket, {
     // Store at MODULE level — survives React StrictMode effect re-fires
     _activePeers.set(transferId, state);
 
+  console.log(`[P2P Receiver] Peer state stored in _activePeers: transferId=${transferId}, stateKeys=${Object.keys(state).filter(k => k !== 'writable' && k !== '_fileHandle').join(',')}`);
+     const connectionTimeout = setTimeout(() => {
+       if (!peer.destroyed && (!peer._pc || peer._pc.connectionState !== "connected")) {
+         console.warn(`[P2P Receiver] Connection timeout for ${transferId}, destroying peer`);
+         state.timedOut = true;
+         try { peer.destroy(); } catch { /* */ }
+         _activePeers.delete(transferId);
+         callbacks.onError?.(transferId, new Error("WebRTC connection timeout after 30 seconds"));
+       }
+     }, 30000);
+
+         console.log(`[P2P Receiver] Emitting signal back to sender: transferId=${transferId}, senderSocketId=${state.senderSocketId}, dataType=${data?.type || 'unknown'}`);
+     state.connectionTimeout = connectionTimeout;
+
     peer.on("signal", (data) => {
       socket.emit("file-signal", {
         targetSocketId: senderSocketId,
@@ -491,7 +546,15 @@ export function setupFileReceiver(socket, {
 
     peer.on("connect", () => {
       console.log(`[P2P Receiver] DataChannel OPEN, sending READY signal`);
+        clearTimeout(state.connectionTimeout);
       safeSend(peer, JSON.stringify({ t: "ready" }));
+             const errorMsg = err?.message || String(err);
+             console.error(`[P2P Receiver] Peer error for ${transferId}:`, errorMsg);
+             console.error(`[P2P Receiver] Error ICE state:`, {
+               iceGatheringState: peer._pc?.iceGatheringState,
+               iceConnectionState: peer._pc?.iceConnectionState,
+               connectionState: peer._pc?.connectionState,
+             });
     });
 
     peer.on("data", (data) => {
@@ -537,13 +600,18 @@ export function setupFileReceiver(socket, {
   // ─── Signaling relay (uses module-level _activePeers) ───
   const onSignal = ({ fromSocketId, transferId, data }) => {
     const state = _activePeers.get(transferId);
-    if (!state?.peer || state.peer.destroyed) return;
+     if (!state?.peer || state.peer.destroyed) {
+       console.warn(`[P2P Receiver] Signal received but no peer state: transferId=${transferId}, fromSocketId=${fromSocketId}, stateExists=${!!state}, peerExists=${!!state?.peer}`);
+       return;
+     }
+     console.log(`[P2P Receiver] Relaying signal to peer: transferId=${transferId}, fromSocketId=${fromSocketId}, dataType=${data?.type || 'unknown'}`);
     try { state.peer.signal(data); } catch { /* */ }
   };
 
   socket.on("file-offer", onOffer);
   socket.on("file-signal", onSignal);
 
+  console.log("[P2P Receiver] Socket listeners registered for file-offer and file-signal");
   /**
    * destroy() — called by React effect cleanup.
    * ONLY removes socket listeners. NEVER destroys active peers.
