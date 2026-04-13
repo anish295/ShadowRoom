@@ -157,6 +157,7 @@ export function ShadowRoomApp() {
   });
   const [mobileActionsVisible, setMobileActionsVisible] = useState(false);
   const [connectedUsers, setConnectedUsers] = useState([]);
+  const [roomAdminId, setRoomAdminId] = useState(null);
   const [typingUsers, setTypingUsers] = useState([]);
   const [showGoToBottom, setShowGoToBottom] = useState(false);
   const [hasNewMessages, setHasNewMessages] = useState(false);
@@ -384,6 +385,23 @@ export function ShadowRoomApp() {
       setConnectedUsers(users);
     });
 
+    socket.on("admin-changed", ({ adminId }) => {
+      setRoomAdminId(adminId || null);
+    });
+
+    socket.on("kicked-from-room", () => {
+      setMessages([]);
+      setConnectedUsers([]);
+      setTypingUsers([]);
+      setRoomAdminId(null);
+      setSessionData(null);
+      setCurrentView("auth");
+      setJoinModalOpen(true);
+      localStorage.removeItem(SESSION_KEY);
+      window.history.replaceState(null, "", "/");
+      alert("You were removed from the room by the admin.");
+    });
+
     // Server-side room join errors (e.g., room deleted after link created)
     socket.on("join-room-error", ({ message }) => {
       showToast("Error", message || "Unable to join room.", "error");
@@ -409,6 +427,8 @@ export function ShadowRoomApp() {
       socket.off("disconnect");
       socket.off("receive-message");
       socket.off("users-updated");
+      socket.off("admin-changed");
+      socket.off("kicked-from-room");
       socket.off("join-room-error");
       socket.off("user-typing");
       socket.off("user-stop-typing");
@@ -964,6 +984,7 @@ export function ShadowRoomApp() {
     socket.emit("leave-room");
     setMessages([]);
     setConnectedUsers([]);
+    setRoomAdminId(null);
     setTypingUsers([]);
     setShowGoToBottom(false);
     setHasNewMessages(false);
@@ -976,6 +997,15 @@ export function ShadowRoomApp() {
     setLeaveModalOpen(false);
     showToast("Left Room", "You have left the room", "info");
   };
+
+  const handleKickUser = useCallback(
+    (targetId) => {
+      if (!targetId || targetId === socket.id) return;
+      if (roomAdminId !== socket.id) return;
+      socket.emit("kick-user", { targetId });
+    },
+    [roomAdminId, socket],
+  );
 
   const handleCopyRoomCode = () => {
     if (!sessionData?.roomCode) return;
@@ -1529,6 +1559,11 @@ export function ShadowRoomApp() {
                         You
                       </span>
                     )}
+                    {user.socketId === roomAdminId && (
+                      <span className="user-badge" style={{ marginLeft: "0.5rem" }}>
+                        Admin
+                      </span>
+                    )}
                   </div>
                   <div className="user-status-text">
                     {typingUsers.includes(user.userName) ? (
@@ -1550,10 +1585,16 @@ export function ShadowRoomApp() {
                     )}
                   </div>
                 </div>
-                {user.userName === sessionData?.userName &&
-                  sessionData?.role === "admin" && (
-                    <span className="user-badge">Admin</span>
-                  )}
+                {roomAdminId === socket.id && user.socketId !== socket.id && (
+                  <button
+                    type="button"
+                    className="reply-btn"
+                    title="Remove user"
+                    onClick={() => handleKickUser(user.socketId)}
+                  >
+                    <i className="fas fa-times" />
+                  </button>
+                )}
               </div>
             ))}
           </div>

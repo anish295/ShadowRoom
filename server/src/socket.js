@@ -73,8 +73,9 @@ export function registerSocketHandlers(io, { pinStore, logger, roomsByCode }) {
     socket.on("join-room", ({ roomCode, userName } = {}) => {
       if (!roomCode || !userName) return;
       const code = String(roomCode).toUpperCase();
+      const room = roomsByCode?.get(code);
 
-      if (roomsByCode && !roomsByCode.has(code)) {
+      if (roomsByCode && !room) {
         socket.emit("join-room-error", { message: "Room not found" });
         return;
       }
@@ -89,14 +90,23 @@ export function registerSocketHandlers(io, { pinStore, logger, roomsByCode }) {
       }
       roomUsers.get(code).set(socket.id, { socketId: socket.id, userName });
 
+      // Assign first connected user as room admin when missing.
+      if (room && !room.adminId) {
+        room.adminId = socket.id;
+      }
+
       // Broadcast updated user list to entire room
       io.to(code).emit("users-updated", getRoomUsersList(code));
+      if (room?.adminId) {
+        io.to(code).emit("admin-changed", { adminId: room.adminId });
+      }
       logger.info("user joined chat room", { code, userName, socketId: socket.id });
     });
 
     socket.on("leave-room", () => {
       const code = socket.data.chatRoom;
       if (!code) return;
+      const room = roomsByCode?.get(code);
 
       const users = roomUsers.get(code);
       if (users) {
@@ -104,6 +114,13 @@ export function registerSocketHandlers(io, { pinStore, logger, roomsByCode }) {
         if (users.size === 0) {
           removeRoomIfEmpty(code, roomsByCode);
         } else {
+          if (room?.adminId === socket.id) {
+            const nextAdmin = Array.from(users.values()).find(
+              (u) => u.socketId !== socket.id,
+            );
+            room.adminId = nextAdmin ? nextAdmin.socketId : room.adminId;
+            io.to(code).emit("admin-changed", { adminId: room.adminId });
+          }
           io.to(code).emit("users-updated", getRoomUsersList(code));
         }
       }
@@ -112,6 +129,35 @@ export function registerSocketHandlers(io, { pinStore, logger, roomsByCode }) {
       socket.data.chatRoom = null;
       socket.data.chatUserName = null;
       logger.info("user left chat room", { code, socketId: socket.id });
+    });
+
+    socket.on("kick-user", ({ targetId } = {}) => {
+      if (!targetId) return;
+
+      const code = socket.data.chatRoom;
+      if (!code) return;
+
+      const room = roomsByCode?.get(code);
+      if (!room || room.adminId !== socket.id) return;
+      if (targetId === socket.id) return;
+
+      const targetSocket = io.sockets.sockets.get(targetId);
+      if (!targetSocket || targetSocket.data.chatRoom !== code) return;
+
+      io.to(targetId).emit("kicked-from-room");
+
+      const users = roomUsers.get(code);
+      if (users) {
+        users.delete(targetId);
+      }
+
+      targetSocket.leave(code);
+      targetSocket.data.chatRoom = null;
+      targetSocket.data.chatUserName = null;
+
+      if (users && users.size > 0) {
+        io.to(code).emit("users-updated", getRoomUsersList(code));
+      }
     });
 
     // ==================== TYPING INDICATOR ====================
@@ -232,12 +278,20 @@ export function registerSocketHandlers(io, { pinStore, logger, roomsByCode }) {
       // Clean up chat room user tracking
       const chatRoom = socket.data.chatRoom;
       if (chatRoom) {
+        const room = roomsByCode?.get(chatRoom);
         const users = roomUsers.get(chatRoom);
         if (users) {
           users.delete(socket.id);
           if (users.size === 0) {
             removeRoomIfEmpty(chatRoom, roomsByCode);
           } else {
+            if (room?.adminId === socket.id) {
+              const nextAdmin = Array.from(users.values()).find(
+                (u) => u.socketId !== socket.id,
+              );
+              room.adminId = nextAdmin ? nextAdmin.socketId : room.adminId;
+              io.to(chatRoom).emit("admin-changed", { adminId: room.adminId });
+            }
             io.to(chatRoom).emit("users-updated", getRoomUsersList(chatRoom));
           }
         }
