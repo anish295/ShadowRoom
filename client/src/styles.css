@@ -2619,13 +2619,13 @@ a {
 }
 
 .shadow-app.stealth-blur {
-  filter: blur(40px);
+  filter: blur(60px) opacity(0);
   pointer-events: none;
   user-select: none;
 }
 
 body.stealth-blur .shadow-app {
-  filter: blur(40px);
+  filter: blur(60px) opacity(0);
   pointer-events: none;
   user-select: none;
 }

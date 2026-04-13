@@ -7,7 +7,7 @@ import React, {
   lazy,
   Suspense,
 } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Moon, Sun, Smile } from "lucide-react";
 import { io } from "socket.io-client";
 import axios from "axios";
@@ -276,7 +276,7 @@ export function ShadowRoomApp() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowPrivacyNotice(false);
-    }, 8000);
+    }, 5000);
 
     return () => clearTimeout(timer);
   }, []);
@@ -292,30 +292,41 @@ export function ShadowRoomApp() {
 
     const onKeyDown = (event) => {
       if (
+        event.key === "PrintScreen" ||
         event.key === "Meta" ||
         event.key === "Control" ||
         event.key === "Alt" ||
+        event.key === "Shift" ||
         event.metaKey ||
         event.ctrlKey ||
-        event.altKey
+        event.altKey ||
+        event.shiftKey
       ) {
         lockUi();
       }
     };
 
+    const onContextMenuAttempt = (event) => {
+      event.preventDefault();
+      lockUi();
+    };
+
     window.addEventListener("blur", lockUi);
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("contextmenu", onContextMenuAttempt);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       window.removeEventListener("blur", lockUi);
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("contextmenu", onContextMenuAttempt);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 
   const handleContextMenu = useCallback((event) => {
     event.preventDefault();
+    setIsManualLocked(true);
   }, []);
 
   // On first load, allow direct join via roomCode query and keep auth if no session.
@@ -2276,14 +2287,20 @@ export function ShadowRoomApp() {
         {currentView === "auth" ? renderAuthView() : renderChatView()}
         {renderModals()}
 
-        {showPrivacyNotice && (
-          <div className="fixed inset-0 z-[11000] flex items-center justify-center bg-[#0F111D]/90 backdrop-blur-xl px-4">
-            <div className="relative w-full max-w-2xl overflow-hidden border-2 border-[#F7D569] bg-[#0F111D] text-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-              <div className="p-6 md:p-8">
-                <p className="text-sm md:text-base font-extrabold tracking-[0.16em] text-[#F7D569] uppercase">
+        <AnimatePresence>
+          {showPrivacyNotice && (
+            <motion.div
+              initial={{ x: 80, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 80, opacity: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="fixed top-24 right-6 z-[11000] w-80 max-w-[calc(100vw-2rem)] overflow-hidden border-2 border-[#F7D569] bg-[#0F111D]/90 text-white backdrop-blur-md shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
+            >
+              <div className="p-4 font-mono">
+                <p className="text-xs font-bold tracking-[0.14em] text-[#F7D569] uppercase">
                   {"> PROTOCOL_ANONYMITY: ACTIVE"}
                 </p>
-                <p className="mt-5 text-sm md:text-base leading-relaxed text-slate-100">
+                <p className="mt-3 text-[11px] leading-relaxed text-slate-100">
                   Shadowroom is a zero-persistence environment. We do not use databases, tracking cookies, or server-side logging. Your messages and files exist only in the P2P tunnel between you and your peers. No traces left behind.
                 </p>
               </div>
@@ -2293,12 +2310,12 @@ export function ShadowRoomApp() {
                   className="h-full bg-[#F7D569]"
                   initial={{ width: "100%" }}
                   animate={{ width: "0%" }}
-                  transition={{ duration: 8, ease: "linear" }}
+                  transition={{ duration: 5, ease: "linear" }}
                 />
               </div>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
       {/* ─── Incoming File Offer Accept/Decline ─── */}
       {pendingOffers.length > 0 && (
@@ -2438,14 +2455,14 @@ export function ShadowRoomApp() {
 
       {isManualLocked && (
         <div
-          className="fixed inset-0 z-[12000] flex items-center justify-center bg-[#0F111D]/70 backdrop-blur-3xl px-4"
+          className="fixed inset-0 z-[12000] flex items-center justify-center bg-[#F7D569] px-4"
           role="alert"
           aria-live="assertive"
           onClick={() => setIsManualLocked(false)}
         >
-          <div className="border-2 border-[#F7D569] bg-[#0F111D] px-7 py-5 text-center shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-            <div className="text-[#F7D569] text-base font-extrabold tracking-[0.12em]">[ SYSTEM_LOCKED ]</div>
-            <div className="mt-2 text-xs tracking-[0.08em] text-slate-300 uppercase">Click anywhere to unlock</div>
+          <div className="border-2 border-[#0F111D] bg-[#F7D569] px-7 py-5 text-center shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+            <div className="text-[#0F111D] text-base font-extrabold tracking-[0.12em]">[ SYSTEM_LOCKED ]</div>
+            <div className="mt-2 text-xs tracking-[0.08em] text-[#0F111D] uppercase">Click anywhere to unlock</div>
           </div>
         </div>
       )}
