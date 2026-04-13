@@ -286,11 +286,12 @@ export function ShadowRoomApp() {
 
     const onKeyDown = (event) => {
       if (
-        event.key === "PrintScreen" ||
-        event.code === "PrintScreen" ||
         event.key === "Meta" ||
         event.code === "MetaLeft" ||
-        event.code === "MetaRight"
+        event.code === "MetaRight" ||
+        event.key === "Alt" ||
+        event.code === "AltLeft" ||
+        event.code === "AltRight"
       ) {
         lockUi();
       }
