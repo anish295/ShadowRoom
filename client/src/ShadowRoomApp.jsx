@@ -171,6 +171,8 @@ export function ShadowRoomApp() {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const fileInputRef = useRef(null);
   const uploadFileInputRef = useRef(null);
+  const isInternalActionRef = useRef(false);
+  const isSystemDialogActive = useRef(false);
 
   // Reply / tagging state
   const [replyingTo, setReplyingTo] = useState(null);
@@ -284,32 +286,59 @@ export function ShadowRoomApp() {
   useEffect(() => {
     const lockUi = () => setIsManualLocked(true);
 
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") {
+        lockUi();
+      }
+    };
+
     const onKeyDown = (event) => {
       if (
         event.key === "PrintScreen" ||
-        event.code === "PrintScreen" ||
         event.key === "Meta" ||
-        event.code === "MetaLeft" ||
-        event.code === "MetaRight"
+        event.key === "Alt" ||
+        event.metaKey ||
+        event.altKey
       ) {
         lockUi();
       }
     };
 
+    const onBlur = () => {
+      // Only lock on real focus loss, not during trusted system dialogs.
+      if (!isInternalActionRef.current && !isSystemDialogActive.current) {
+        lockUi();
+      }
+    };
+
+    window.addEventListener("blur", onBlur);
     window.addEventListener("keydown", onKeyDown);
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
+      window.removeEventListener("blur", onBlur);
       window.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 
   const openFilePickerWithExemption = useCallback(() => {
+    // Set internal action flag to bypass blur-lock during file picker
+    isInternalActionRef.current = true;
     uploadFileInputRef.current?.click();
+    // Reset after 2 seconds to restore normal security behavior
+    setTimeout(() => {
+      isInternalActionRef.current = false;
+    }, 2000);
   }, []);
 
   const handleDownload = useCallback((url, filename) => {
     if (!url) return;
+    isSystemDialogActive.current = true;
     triggerDownload(url, filename);
+    setTimeout(() => {
+      isSystemDialogActive.current = false;
+    }, 5000);
   }, []);
 
   // On first load, allow direct join via roomCode query and keep auth if no session.
