@@ -1588,7 +1588,7 @@ export function ShadowRoomApp() {
                 {roomAdminId === socket.id && user.socketId !== socket.id && (
                   <button
                     type="button"
-                    className="reply-btn"
+                    className="user-remove-btn"
                     title="Remove user"
                     onClick={() => handleKickUser(user.socketId)}
                   >
