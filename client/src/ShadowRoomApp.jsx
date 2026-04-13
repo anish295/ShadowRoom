@@ -2160,7 +2160,7 @@ export function ShadowRoomApp() {
                 <strong>Click to add files</strong> or drag and drop
               </p>
               <p className="upload-hint">
-                PDF, DOCX, TXT, Images, ZIP (Max 2 GB per file)
+                PDF, DOCX, TXT, Images, ZIP, Etc...
               </p>
             </div>
             <input
