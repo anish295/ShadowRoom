@@ -2618,46 +2618,6 @@ a {
   height: 100%;
 }
 
-.shadow-app.stealth-blur {
-  filter: blur(40px);
-  pointer-events: none;
-  user-select: none;
-}
-
-.shadow-lock-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 12000;
-  background: rgba(8, 11, 20, 0.65);
-  backdrop-filter: blur(3px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-}
-
-.shadow-lock-card {
-  width: min(440px, 100%);
-  background: #0F111D;
-  border: 2px solid #F7D569;
-  box-shadow: 6px 6px 0px rgba(247, 213, 105, 0.45);
-  padding: 1.2rem 1.4rem;
-  text-align: center;
-}
-
-.shadow-lock-title {
-  color: #F7D569;
-  font-size: 1.1rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-}
-
-.shadow-lock-subtitle {
-  margin-top: 0.35rem;
-  color: #d6deec;
-  font-size: 0.85rem;
-}
-
 @media print {
   body {
     display: none !important;

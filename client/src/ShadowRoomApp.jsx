@@ -159,7 +159,6 @@ export function ShadowRoomApp() {
   const [connectedUsers, setConnectedUsers] = useState([]);
   const [adminId, setAdminId] = useState(null);
   const [typingUsers, setTypingUsers] = useState([]);
-  const [isShadowLocked, setIsShadowLocked] = useState(false);
   const [showGoToBottom, setShowGoToBottom] = useState(false);
   const [unreadWhileScrolled, setUnreadWhileScrolled] = useState(0);
 
@@ -270,37 +269,6 @@ export function ShadowRoomApp() {
   // Apply theme on mount
   useEffect(() => {
     document.documentElement.classList.toggle("light", !isDarkMode);
-  }, []);
-
-  useEffect(() => {
-    const lockUi = () => setIsShadowLocked(true);
-    const unlockUi = () => {
-      if (document.visibilityState === "visible" && document.hasFocus()) {
-        setIsShadowLocked(false);
-      }
-    };
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState !== "visible") {
-        lockUi();
-      } else {
-        unlockUi();
-      }
-    };
-
-    window.addEventListener("blur", lockUi);
-    window.addEventListener("focus", unlockUi);
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    return () => {
-      window.removeEventListener("blur", lockUi);
-      window.removeEventListener("focus", unlockUi);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, []);
-
-  const handleContextMenu = useCallback((event) => {
-    event.preventDefault();
   }, []);
 
   // On first load, allow direct join via roomCode query and keep auth if no session.
@@ -2254,10 +2222,7 @@ export function ShadowRoomApp() {
 
   return (
     <>
-      <div
-        className={isShadowLocked ? "shadow-app stealth-blur" : "shadow-app"}
-        onContextMenu={handleContextMenu}
-      >
+      <div className="shadow-app">
         {currentView === "auth" ? renderAuthView() : renderChatView()}
         {renderModals()}
 
@@ -2396,15 +2361,6 @@ export function ShadowRoomApp() {
 
         <ToastContainer toasts={toasts} onRemove={removeToast} />
       </div>
-
-      {isShadowLocked && (
-        <div className="shadow-lock-overlay" role="alert" aria-live="assertive">
-          <div className="shadow-lock-card">
-            <div className="shadow-lock-title">SHADOW_LOCKED</div>
-            <div className="shadow-lock-subtitle">Window focus lost. Return to this tab to continue.</div>
-          </div>
-        </div>
-      )}
     </>
   );
 }
