@@ -7,7 +7,7 @@ import React, {
   lazy,
   Suspense,
 } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Moon, Sun, Smile } from "lucide-react";
 import { io } from "socket.io-client";
 import axios from "axios";
@@ -205,6 +205,7 @@ export function ShadowRoomApp() {
   );
   const [titleIndex, setTitleIndex] = useState(0);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [showSystemHandshake, setShowSystemHandshake] = useState(true);
 
   // ==================== HELPERS ====================
   const showToast = useCallback((title, message, type = "success") => {
@@ -454,6 +455,14 @@ export function ShadowRoomApp() {
       modalSendBtnRef.current?.focus();
     }
   }, [fileModalOpen]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setShowSystemHandshake(false);
+    }, 5000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
   // ==================== TYPING INDICATOR ====================
   const handleTyping = useCallback(() => {
@@ -1077,6 +1086,37 @@ export function ShadowRoomApp() {
               alt="ShadowRoom Logo"
               className="logo-mark"
             />
+              <AnimatePresence>
+                {showSystemHandshake && (
+                  <motion.div
+                    key="system-handshake"
+                    initial={{ x: 100, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    exit={{ x: 100, opacity: 0 }}
+                    transition={{ duration: 0.35, ease: "easeOut" }}
+                    className="fixed right-6 top-24 z-[90] w-80"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <div className="relative overflow-hidden border-2 border-[#F7D569] bg-[#0F111D]/90 p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] backdrop-blur-md">
+                      <div className="font-mono text-xs font-bold uppercase tracking-[0.24em] text-[#F7D569]">
+                        &gt; PROTOCOL_ANONYMITY: ACTIVE
+                      </div>
+                      <p className="mt-3 text-[0.72rem] uppercase leading-5 tracking-[0.18em] text-slate-300">
+                        Shadowroom is a zero-persistence environment. We do not use databases, tracking cookies, or server-side logging. Your messages and files exist only in the P2P tunnel between you and your peers. No traces left behind.
+                      </p>
+                      <motion.div
+                        aria-hidden="true"
+                        className="absolute bottom-0 left-0 h-[2px] bg-[#F7D569]"
+                        initial={{ width: "100%" }}
+                        animate={{ width: "0%" }}
+                        transition={{ duration: 5, ease: "linear" }}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
           </div>
           <span>ShadowRoom</span>
         </div>
