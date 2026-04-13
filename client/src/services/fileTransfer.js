@@ -493,19 +493,19 @@ export function setupFileReceiver(socket, {
     console.log(`[P2P Receiver] Accepting transfer ${transferId}`);
     socket.emit("file-accept", { senderSocketId, transferId });
 
-    // Write queue: serialize all incoming data processing
-    let writeQueuePromise = Promise.resolve();
-
     // 4. Create peer
     const peer = new Peer({
       initiator: false,
       trickle: true,
       allowHalfOpen: true,  // CRITICAL: prevents Duplex stream _onFinish from auto-destroying
       config: { iceServers: ICE_SERVERS },
-      iceTransportPolicy: "all",
     });
 
-    console.log(`[P2P Receiver] Peer created: initiator=false, transferId=${transferId}`);
+  iceTransportPolicy: "all",
+    // Write queue: serialize all incoming data processing
+    let writeQueuePromise = Promise.resolve();
+
+  console.log(`[P2P Receiver] Peer created: initiator=false, transferId=${transferId}`);
     const state = {
       peer,
       meta: null,
@@ -522,20 +522,21 @@ export function setupFileReceiver(socket, {
     // Store at MODULE level — survives React StrictMode effect re-fires
     _activePeers.set(transferId, state);
 
-    console.log(`[P2P Receiver] Peer state stored in _activePeers: transferId=${transferId}, stateKeys=${Object.keys(state).filter((k) => k !== "writable" && k !== "_fileHandle").join(",")}`);
-    const connectionTimeout = setTimeout(() => {
-      if (!peer.destroyed && (!peer._pc || peer._pc.connectionState !== "connected")) {
-        console.warn(`[P2P Receiver] Connection timeout for ${transferId}, destroying peer`);
-        state.timedOut = true;
-        try { peer.destroy(); } catch { /* */ }
-        _activePeers.delete(transferId);
-        callbacks.onError?.(transferId, new Error("WebRTC connection timeout after 30 seconds"));
-      }
-    }, 30000);
-    state.connectionTimeout = connectionTimeout;
+  console.log(`[P2P Receiver] Peer state stored in _activePeers: transferId=${transferId}, stateKeys=${Object.keys(state).filter(k => k !== 'writable' && k !== '_fileHandle').join(',')}`);
+     const connectionTimeout = setTimeout(() => {
+       if (!peer.destroyed && (!peer._pc || peer._pc.connectionState !== "connected")) {
+         console.warn(`[P2P Receiver] Connection timeout for ${transferId}, destroying peer`);
+         state.timedOut = true;
+         try { peer.destroy(); } catch { /* */ }
+         _activePeers.delete(transferId);
+         callbacks.onError?.(transferId, new Error("WebRTC connection timeout after 30 seconds"));
+       }
+     }, 30000);
+
+         console.log(`[P2P Receiver] Emitting signal back to sender: transferId=${transferId}, senderSocketId=${state.senderSocketId}, dataType=${data?.type || 'unknown'}`);
+     state.connectionTimeout = connectionTimeout;
 
     peer.on("signal", (data) => {
-      console.log(`[P2P Receiver] Emitting signal back to sender: transferId=${transferId}, senderSocketId=${state.senderSocketId}, dataType=${data?.type || "unknown"}`);
       socket.emit("file-signal", {
         targetSocketId: senderSocketId,
         transferId,
@@ -545,8 +546,15 @@ export function setupFileReceiver(socket, {
 
     peer.on("connect", () => {
       console.log(`[P2P Receiver] DataChannel OPEN, sending READY signal`);
-      clearTimeout(state.connectionTimeout);
+        clearTimeout(state.connectionTimeout);
       safeSend(peer, JSON.stringify({ t: "ready" }));
+             const errorMsg = err?.message || String(err);
+             console.error(`[P2P Receiver] Peer error for ${transferId}:`, errorMsg);
+             console.error(`[P2P Receiver] Error ICE state:`, {
+               iceGatheringState: peer._pc?.iceGatheringState,
+               iceConnectionState: peer._pc?.iceConnectionState,
+               connectionState: peer._pc?.connectionState,
+             });
     });
 
     peer.on("data", (data) => {
