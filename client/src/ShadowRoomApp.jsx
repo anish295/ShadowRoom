@@ -172,7 +172,6 @@ export function ShadowRoomApp() {
   const fileInputRef = useRef(null);
   const uploadFileInputRef = useRef(null);
   const isInternalActionRef = useRef(false);
-  const isSystemDialogActive = useRef(false);
 
   // Reply / tagging state
   const [replyingTo, setReplyingTo] = useState(null);
@@ -304,22 +303,36 @@ export function ShadowRoomApp() {
       }
     };
 
+    const onContextMenuAttempt = (event) => {
+      // Allow right-click but keep blur-on-focus-loss active
+      // User can right-click to inspect, but if they move mouse to DevTools, screen will blur
+      event.preventDefault();
+    };
+
     const onBlur = () => {
-      // Only lock on real focus loss, not during trusted system dialogs.
-      if (!isInternalActionRef.current && !isSystemDialogActive.current) {
+      // Only lock if not in internal action (file-picker bypass)
+      if (!isInternalActionRef.current) {
         lockUi();
       }
     };
 
     window.addEventListener("blur", onBlur);
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("contextmenu", onContextMenuAttempt);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       window.removeEventListener("blur", onBlur);
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("contextmenu", onContextMenuAttempt);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
+  }, []);
+
+  const handleContextMenu = useCallback((event) => {
+    event.preventDefault();
+    // Note: Removed automatic lock to allow developer tools inspection
+    // Blur event will still trigger lock if focus truly leaves the window
   }, []);
 
   const openFilePickerWithExemption = useCallback(() => {
@@ -330,15 +343,6 @@ export function ShadowRoomApp() {
     setTimeout(() => {
       isInternalActionRef.current = false;
     }, 2000);
-  }, []);
-
-  const handleDownload = useCallback((url, filename) => {
-    if (!url) return;
-    isSystemDialogActive.current = true;
-    triggerDownload(url, filename);
-    setTimeout(() => {
-      isSystemDialogActive.current = false;
-    }, 5000);
   }, []);
 
   // On first load, allow direct join via roomCode query and keep auth if no session.
@@ -1203,7 +1207,7 @@ export function ShadowRoomApp() {
     };
 
     const downloadFile = () => {
-      if (blobUrl) handleDownload(blobUrl, m.fileName);
+      if (blobUrl) triggerDownload(blobUrl, m.fileName);
     };
 
     return (
@@ -2294,6 +2298,7 @@ export function ShadowRoomApp() {
     <>
       <div
         className={isManualLocked ? "shadow-app stealth-blur pointer-events-none" : "shadow-app"}
+        onContextMenu={handleContextMenu}
       >
         {currentView === "auth" ? renderAuthView() : renderChatView()}
         {renderModals()}
