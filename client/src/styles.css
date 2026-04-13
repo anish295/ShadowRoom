@@ -2575,6 +2575,11 @@ a {
   transition: all 0.2s ease;
 }
 
+.shadow-app {
+  width: 100%;
+  height: 100%;
+}
+
 .selected-file-remove:hover {
   background: var(--danger);
   border-color: var(--danger);
