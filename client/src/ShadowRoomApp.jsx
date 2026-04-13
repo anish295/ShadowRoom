@@ -144,6 +144,7 @@ export function ShadowRoomApp() {
   const [joinModalOpen, setJoinModalOpen] = useState(false);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
   const [fileModalOpen, setFileModalOpen] = useState(false);
+  const [kickedModalOpen, setKickedModalOpen] = useState(false);
 
   // Users sidebar
   const [isMobile, setIsMobile] = useState(() => {
@@ -161,6 +162,7 @@ export function ShadowRoomApp() {
   const [typingUsers, setTypingUsers] = useState([]);
   const [showGoToBottom, setShowGoToBottom] = useState(false);
   const [hasNewMessages, setHasNewMessages] = useState(false);
+  const [isManualLocked, setIsManualLocked] = useState(false);
 
   // Toasts
   const [toasts, setToasts] = useState([]);
@@ -396,10 +398,10 @@ export function ShadowRoomApp() {
       setRoomAdminId(null);
       setSessionData(null);
       setCurrentView("auth");
-      setJoinModalOpen(true);
+      setJoinModalOpen(false);
+      setKickedModalOpen(true);
       localStorage.removeItem(SESSION_KEY);
       window.history.replaceState(null, "", "/");
-      alert("You were removed from the room by the admin.");
     });
 
     // Server-side room join errors (e.g., room deleted after link created)
@@ -529,6 +531,19 @@ export function ShadowRoomApp() {
       modalSendBtnRef.current?.focus();
     }
   }, [fileModalOpen]);
+
+  useEffect(() => {
+    const onManualLockKey = (event) => {
+      if (event.key === "Meta" || event.key === "Alt") {
+        setIsManualLocked(true);
+      }
+    };
+
+    window.addEventListener("keydown", onManualLockKey);
+    return () => {
+      window.removeEventListener("keydown", onManualLockKey);
+    };
+  }, []);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -2240,148 +2255,207 @@ export function ShadowRoomApp() {
           </div>
         </div>
       </div>
+
+      {/* Kicked Popup */}
+      <div
+        className={`modal-overlay ${kickedModalOpen ? "active" : ""}`}
+        onClick={(e) =>
+          e.target === e.currentTarget && setKickedModalOpen(false)
+        }
+      >
+        <div className="modal" style={{ maxWidth: 420 }}>
+          <div className="confirm-modal-content">
+            <div className="confirm-icon" style={{ background: "rgba(239, 68, 68, 0.12)", color: "#ef4444" }}>
+              <i className="fas fa-user-slash"></i>
+            </div>
+            <h3 className="confirm-title">Removed By Admin</h3>
+            <p className="confirm-text">
+              The room admin removed you from this session.
+            </p>
+            <div className="confirm-actions">
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setKickedModalOpen(false);
+                  setJoinModalOpen(true);
+                }}
+              >
+                <i className="fas fa-sign-in-alt"></i>
+                Join Another Room
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </>
   );
 
   return (
     <>
-      {currentView === "auth" ? renderAuthView() : renderChatView()}
-      {renderModals()}
+      <div
+        className="shadow-app"
+        style={{
+          filter: isManualLocked ? "blur(40px)" : "none",
+          pointerEvents: isManualLocked ? "none" : "auto",
+        }}
+      >
+        {currentView === "auth" ? renderAuthView() : renderChatView()}
+        {renderModals()}
 
-      {/* ─── Incoming File Offer Accept/Decline ─── */}
-      {pendingOffers.length > 0 && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(15,17,29,0.65)", backdropFilter: "blur(24px)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          zIndex: 10000, padding: "1rem",
-        }}>
+        {/* ─── Incoming File Offer Accept/Decline ─── */}
+        {pendingOffers.length > 0 && (
           <div style={{
-            background: isDarkMode ? "#0F111D" : "#FFFFFF",
-            border: "2px solid #0F111D",
-            borderRadius: 22, padding: "2rem", maxWidth: 460, width: "100%",
-            boxShadow: `4px 4px 0px ${isDarkMode ? "#F7D569" : "#0F111D"}`,
-            color: isDarkMode ? "#FFFFFF" : "#0F111D",
-            backdropFilter: "blur(40px)",
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(15,17,29,0.65)", backdropFilter: "blur(24px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 10000, padding: "1rem",
           }}>
-            {/* Header */}
-            <div className="download-list-header">
-              <div style={{
-                width: 52, height: 52, borderRadius: 15, margin: "0 auto 1rem",
-                background: "var(--accent-glow, rgba(99,102,241,0.15))",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "1.4rem", color: "var(--accent, #6366f1)",
-              }}>
-                <i className="fas fa-file-download" />
-              </div>
-              <div
-                className="download-list-title"
-                style={{ color: isDarkMode ? "#FFFFFF" : "#0F111D" }}
-              >
-                Incoming {pendingOffers.length === 1 ? "File" : `${pendingOffers.length} Files`}
-              </div>
-              <div
-                className="download-list-subtitle"
-                style={{ color: isDarkMode ? "#94A3B8" : "#475569" }}
-              >
-                from <strong style={{ color: isDarkMode ? "#94A3B8" : "#475569" }}>
-                  {pendingOffers[0]?.senderName}
-                </strong> · select which to download
-              </div>
-            </div>
-
-            {/* Countdown (smallest remaining time) */}
-            {(() => {
-              const secsLeft = Math.max(
-                0,
-                Math.ceil((Math.min(...pendingOffers.map((o) => o.expiresAt)) - Date.now()) / 1000),
-              );
-              return (
+            <div style={{
+              background: isDarkMode ? "#0F111D" : "#FFFFFF",
+              border: "2px solid #0F111D",
+              borderRadius: 22, padding: "2rem", maxWidth: 460, width: "100%",
+              boxShadow: `4px 4px 0px ${isDarkMode ? "#F7D569" : "#0F111D"}`,
+              color: isDarkMode ? "#FFFFFF" : "#0F111D",
+              backdropFilter: "blur(40px)",
+            }}>
+              {/* Header */}
+              <div className="download-list-header">
+                <div style={{
+                  width: 52, height: 52, borderRadius: 15, margin: "0 auto 1rem",
+                  background: "var(--accent-glow, rgba(99,102,241,0.15))",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "1.4rem", color: "var(--accent, #6366f1)",
+                }}>
+                  <i className="fas fa-file-download" />
+                </div>
                 <div
-                  className="download-list-countdown"
+                  className="download-list-title"
+                  style={{ color: isDarkMode ? "#FFFFFF" : "#0F111D" }}
+                >
+                  Incoming {pendingOffers.length === 1 ? "File" : `${pendingOffers.length} Files`}
+                </div>
+                <div
+                  className="download-list-subtitle"
+                  style={{ color: isDarkMode ? "#94A3B8" : "#475569" }}
+                >
+                  from <strong style={{ color: isDarkMode ? "#94A3B8" : "#475569" }}>
+                    {pendingOffers[0]?.senderName}
+                  </strong> · select which to download
+                </div>
+              </div>
+
+              {/* Countdown (smallest remaining time) */}
+              {(() => {
+                const secsLeft = Math.max(
+                  0,
+                  Math.ceil((Math.min(...pendingOffers.map((o) => o.expiresAt)) - Date.now()) / 1000),
+                );
+                return (
+                  <div
+                    className="download-list-countdown"
+                    style={{
+                      color: isDarkMode
+                        ? (secsLeft <= 5 ? "#FB923C" : "#F7C25A")
+                        : (secsLeft <= 5 ? "#EA580C" : "#2563EB"),
+                    }}
+                  >
+                    <i className="fas fa-clock" style={{ marginRight: "0.3rem" }} />
+                    Auto-decline in {secsLeft}s
+                  </div>
+                );
+              })()}
+
+              {/* File checkboxes */}
+              <div className="download-list-files">
+                {pendingOffers.map((offer) => (
+                  <div
+                    key={offer.transferId}
+                    className={`download-list-item ${offer.checked ? "checked" : ""}`}
+                    onClick={() => toggleOfferCheck(offer.transferId)}
+                  >
+                    <div className="download-list-checkbox">
+                      {offer.checked && <i className="fas fa-check" />}
+                    </div>
+                    <i className={`fas ${getFileIcon(offer.fileName)} download-list-file-icon`} />
+                    <div className="download-list-file-info">
+                      <div className="download-list-file-name" title={offer.fileName}>
+                        {offer.fileName}
+                      </div>
+                      <div
+                        className="download-list-file-size"
+                        style={{ color: isDarkMode ? "#94A3B8" : "#475569" }}
+                      >
+                        {(offer.fileSize / 1024 / 1024).toFixed(2)} MB
+                        {offer.fileType && ` · ${offer.fileType.split("/")[1] || offer.fileType}`}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Actions */}
+              <div className="download-list-actions">
+                <button
+                  className="btn"
                   style={{
-                    color: isDarkMode
-                      ? (secsLeft <= 5 ? "#FB923C" : "#F7C25A")
-                      : (secsLeft <= 5 ? "#EA580C" : "#2563EB"),
+                    flex: 1,
+                    padding: "0.75rem",
+                    borderRadius: 12,
+                    fontWeight: 600,
+                    background: isDarkMode ? "transparent" : "#F1F5F9",
+                    color: isDarkMode ? "#FFFFFF" : "#0F172A",
+                    border: "2px solid #0F111D",
+                    boxShadow: `4px 4px 0px ${isDarkMode ? "#F7D569" : "#0F111D"}`,
                   }}
+                  onClick={handleDeclineAll}
                 >
-                  <i className="fas fa-clock" style={{ marginRight: "0.3rem" }} />
-                  Auto-decline in {secsLeft}s
-                </div>
-              );
-            })()}
-
-            {/* File checkboxes */}
-            <div className="download-list-files">
-              {pendingOffers.map((offer) => (
-                <div
-                  key={offer.transferId}
-                  className={`download-list-item ${offer.checked ? "checked" : ""}`}
-                  onClick={() => toggleOfferCheck(offer.transferId)}
+                  <i className="fas fa-times" style={{ marginRight: "0.4rem" }} />
+                  Decline All
+                </button>
+                <button
+                  className="btn"
+                  style={{
+                    flex: 1,
+                    padding: "0.75rem",
+                    borderRadius: 12,
+                    fontWeight: 600,
+                    background: "#F7D569",
+                    color: "#0F111D",
+                    border: "2px solid #0F111D",
+                    boxShadow: `4px 4px 0px ${isDarkMode ? "#F7D569" : "#0F111D"}`,
+                  }}
+                  disabled={!pendingOffers.some((o) => o.checked)}
+                  onClick={handleDownloadSelected}
                 >
-                  <div className="download-list-checkbox">
-                    {offer.checked && <i className="fas fa-check" />}
-                  </div>
-                  <i className={`fas ${getFileIcon(offer.fileName)} download-list-file-icon`} />
-                  <div className="download-list-file-info">
-                    <div className="download-list-file-name" title={offer.fileName}>
-                      {offer.fileName}
-                    </div>
-                    <div
-                      className="download-list-file-size"
-                      style={{ color: isDarkMode ? "#94A3B8" : "#475569" }}
-                    >
-                      {(offer.fileSize / 1024 / 1024).toFixed(2)} MB
-                      {offer.fileType && ` · ${offer.fileType.split("/")[1] || offer.fileType}`}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                  <i className="fas fa-download" style={{ marginRight: "0.4rem" }} />
+                  Download Selected
+                </button>
+              </div>
             </div>
+          </div>
+        )}
 
-            {/* Actions */}
-            <div className="download-list-actions">
-              <button
-                className="btn"
-                style={{
-                  flex: 1,
-                  padding: "0.75rem",
-                  borderRadius: 12,
-                  fontWeight: 600,
-                  background: isDarkMode ? "transparent" : "#F1F5F9",
-                  color: isDarkMode ? "#FFFFFF" : "#0F172A",
-                  border: "2px solid #0F111D",
-                  boxShadow: `4px 4px 0px ${isDarkMode ? "#F7D569" : "#0F111D"}`,
-                }}
-                onClick={handleDeclineAll}
-              >
-                <i className="fas fa-times" style={{ marginRight: "0.4rem" }} />
-                Decline All
-              </button>
-              <button
-                className="btn"
-                style={{
-                  flex: 1,
-                  padding: "0.75rem",
-                  borderRadius: 12,
-                  fontWeight: 600,
-                  background: "#F7D569",
-                  color: "#0F111D",
-                  border: "2px solid #0F111D",
-                  boxShadow: `4px 4px 0px ${isDarkMode ? "#F7D569" : "#0F111D"}`,
-                }}
-                disabled={!pendingOffers.some((o) => o.checked)}
-                onClick={handleDownloadSelected}
-              >
-                <i className="fas fa-download" style={{ marginRight: "0.4rem" }} />
-                Download Selected
-              </button>
+        <ToastContainer toasts={toasts} onRemove={removeToast} />
+      </div>
+
+      {isManualLocked && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0F111D]/60 p-4 backdrop-blur-3xl"
+          role="dialog"
+          aria-modal="true"
+          aria-label="System locked"
+          onClick={() => setIsManualLocked(false)}
+        >
+          <div className="border-2 border-[#F7D569] bg-[#0F111D]/90 px-8 py-6 text-center shadow-[8px_8px_0px_0px_#000000]">
+            <div className="font-mono text-lg font-bold uppercase tracking-[0.18em] text-[#F7D569]">
+              [ SYSTEM_LOCKED ]
             </div>
+            <p className="mt-2 text-xs uppercase tracking-[0.12em] text-slate-300">
+              Click anywhere to unlock
+            </p>
           </div>
         </div>
       )}
-
-      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </>
   );
 }
