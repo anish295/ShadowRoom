@@ -294,9 +294,13 @@ export function ShadowRoomApp() {
       if (
         event.key === "PrintScreen" ||
         event.key === "Meta" ||
+        event.key === "Control" ||
         event.key === "Alt" ||
+        event.key === "Shift" ||
         event.metaKey ||
-        event.altKey
+        event.ctrlKey ||
+        event.altKey ||
+        event.shiftKey
       ) {
         lockUi();
       }
