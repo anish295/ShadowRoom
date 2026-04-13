@@ -170,28 +170,6 @@ function flushPendingSignals(transferId, peer, prefix = "[P2P Receiver]") {
   _pendingSignals.delete(transferId);
 }
 
-function attachPeerConnectionDebug(peer, prefix, meta = {}) {
-  const pc = peer?._pc;
-  if (!pc) {
-    console.warn(`${prefix} RTCPeerConnection missing for debug`, meta);
-    return;
-  }
-
-  const base = `transferId=${meta.transferId || "unknown"}, remoteSocketId=${meta.remoteSocketId || "unknown"}`;
-  const logStates = (tag) => {
-    console.log(
-      `${prefix} ${tag}: ${base}, signalingState=${pc.signalingState}, iceGatheringState=${pc.iceGatheringState}, ` +
-      `iceConnectionState=${pc.iceConnectionState}, connectionState=${pc.connectionState}`,
-    );
-  };
-
-  logStates("pc-init");
-  pc.addEventListener("icegatheringstatechange", () => logStates("icegatheringstatechange"));
-  pc.addEventListener("iceconnectionstatechange", () => logStates("iceconnectionstatechange"));
-  pc.addEventListener("connectionstatechange", () => logStates("connectionstatechange"));
-  pc.addEventListener("signalingstatechange", () => logStates("signalingstatechange"));
-}
-
 
 // ═══════════════════════════════════════════════════════════════════════
 //  SENDER
@@ -221,10 +199,6 @@ export function sendFileP2P(socket, roomCode, userName, file, {
 
   const onAccept = ({ receiverSocketId, transferId: tid }) => {
     if (tid !== transferId || cancelled) return;
-    if (peers.has(receiverSocketId)) {
-      console.warn(`[P2P Sender] Duplicate file-accept ignored: transferId=${tid}, receiverSocketId=${receiverSocketId}`);
-      return;
-    }
     expectedReceivers++;
     console.log(`[P2P Sender] Receiver accepted: ${receiverSocketId}`);
     createSenderPeer(receiverSocketId);
@@ -264,10 +238,6 @@ export function sendFileP2P(socket, roomCode, userName, file, {
 
      const peerState = { peer, ackReceived: false, streaming: false, timedOut: false, connectionTimeout };
     peers.set(receiverSocketId, peerState);
-    attachPeerConnectionDebug(peer, "[P2P Sender]", {
-      transferId,
-      remoteSocketId: receiverSocketId,
-    });
 
     peer.on("signal", (data) => {
       console.log(`[P2P Sender] Emitting signal event: transferId=${transferId}, receiverSocketId=${receiverSocketId}, dataType=${data?.type || "unknown"}`);
@@ -561,7 +531,10 @@ export function setupFileReceiver(socket, {
       console.log("[P2P Receiver] File System Access API not available, using MEMORY mode");
     }
 
-    // 3. Initialize receiver peer FIRST to avoid missing early offer/candidate signals.
+    // 3. Accept
+    console.log(`[P2P Receiver] Accepting transfer ${transferId}`);
+    socket.emit("file-accept", { senderSocketId, transferId });
+
     // Write queue: serialize all incoming data processing
     let writeQueuePromise = Promise.resolve();
 
@@ -587,10 +560,6 @@ export function setupFileReceiver(socket, {
       finished: false,
       _fileHandle: fileHandle,  // for re-reading saved file after transfer
     };
-    attachPeerConnectionDebug(peer, "[P2P Receiver]", {
-      transferId,
-      remoteSocketId: senderSocketId,
-    });
 
     if (typeof peer._onConnectionStateChange === "function") {
       const originalOnConnectionStateChange = peer._onConnectionStateChange.bind(peer);
@@ -612,10 +581,6 @@ export function setupFileReceiver(socket, {
     // Store at MODULE level — survives React StrictMode effect re-fires
     _activePeers.set(transferId, state);
     flushPendingSignals(transferId, peer);
-
-    // 4. Accept only after receiver peer is fully ready.
-    console.log(`[P2P Receiver] Accepting transfer ${transferId}`);
-    socket.emit("file-accept", { senderSocketId, transferId });
 
     console.log(`[P2P Receiver] Peer state stored in _activePeers: transferId=${transferId}, stateKeys=${Object.keys(state).filter((k) => k !== "writable" && k !== "_fileHandle").join(",")}`);
     const connectionTimeout = setTimeout(() => {
@@ -688,20 +653,11 @@ export function setupFileReceiver(socket, {
   // ─── Signaling relay (uses module-level _activePeers) ───
   const onSignal = ({ fromSocketId, transferId, data }) => {
     const state = _activePeers.get(transferId);
-    const hasPendingOffer = _pendingOffers.has(transferId);
     if (!state?.peer || state.peer.destroyed) {
-      if (!hasPendingOffer) {
-        console.warn(
-          `[P2P Receiver] Ignoring unrelated signal: transferId=${transferId}, fromSocketId=${fromSocketId}, ` +
-          `stateExists=${!!state}, hasPendingOffer=${hasPendingOffer}, dataType=${data?.type || "unknown"}`,
-        );
-        return;
-      }
       const queued = queuePendingSignal(transferId, { fromSocketId, data });
       console.warn(
         `[P2P Receiver] Signal queued (peer not ready): transferId=${transferId}, fromSocketId=${fromSocketId}, ` +
-        `stateExists=${!!state}, peerExists=${!!state?.peer}, peerDestroyed=${state?.peer?.destroyed === true}, ` +
-        `hasPendingOffer=${hasPendingOffer}, queuedCount=${queued}, dataType=${data?.type || "unknown"}`,
+        `stateExists=${!!state}, peerExists=${!!state?.peer}, peerDestroyed=${state?.peer?.destroyed === true}, queuedCount=${queued}, dataType=${data?.type || "unknown"}`,
       );
       return;
     }
