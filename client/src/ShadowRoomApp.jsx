@@ -131,6 +131,7 @@ export function ShadowRoomApp() {
   const [pendingOffers, setPendingOffers] = useState([]);
   const fileReceiverRef = useRef(null); // holds { acceptOffer, declineOffer }
   const [error, setError] = useState("");
+  const [showPrivacyNotice, setShowPrivacyNotice] = useState(true);
 
   // Theme
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -159,7 +160,7 @@ export function ShadowRoomApp() {
   const [connectedUsers, setConnectedUsers] = useState([]);
   const [adminId, setAdminId] = useState(null);
   const [typingUsers, setTypingUsers] = useState([]);
-  const [isShadowLocked, setIsShadowLocked] = useState(false);
+  const [isManualLocked, setIsManualLocked] = useState(false);
   const [showGoToBottom, setShowGoToBottom] = useState(false);
   const [unreadWhileScrolled, setUnreadWhileScrolled] = useState(0);
 
@@ -273,28 +274,42 @@ export function ShadowRoomApp() {
   }, []);
 
   useEffect(() => {
-    const lockUi = () => setIsShadowLocked(true);
-    const unlockUi = () => {
-      if (document.visibilityState === "visible" && document.hasFocus()) {
-        setIsShadowLocked(false);
-      }
-    };
+    const timer = setTimeout(() => {
+      setShowPrivacyNotice(false);
+    }, 8000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const lockUi = () => setIsManualLocked(true);
 
     const onVisibilityChange = () => {
       if (document.visibilityState !== "visible") {
         lockUi();
-      } else {
-        unlockUi();
+      }
+    };
+
+    const onKeyDown = (event) => {
+      if (
+        event.key === "Meta" ||
+        event.key === "Control" ||
+        event.key === "Alt" ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey
+      ) {
+        lockUi();
       }
     };
 
     window.addEventListener("blur", lockUi);
-    window.addEventListener("focus", unlockUi);
+    window.addEventListener("keydown", onKeyDown);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       window.removeEventListener("blur", lockUi);
-      window.removeEventListener("focus", unlockUi);
+      window.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
@@ -2255,11 +2270,35 @@ export function ShadowRoomApp() {
   return (
     <>
       <div
-        className={isShadowLocked ? "shadow-app stealth-blur" : "shadow-app"}
+        className={isManualLocked ? "shadow-app stealth-blur pointer-events-none" : "shadow-app"}
         onContextMenu={handleContextMenu}
       >
         {currentView === "auth" ? renderAuthView() : renderChatView()}
         {renderModals()}
+
+        {showPrivacyNotice && (
+          <div className="fixed inset-0 z-[11000] flex items-center justify-center bg-[#0F111D]/90 backdrop-blur-xl px-4">
+            <div className="relative w-full max-w-2xl overflow-hidden border-2 border-[#F7D569] bg-[#0F111D] text-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+              <div className="p-6 md:p-8">
+                <p className="text-sm md:text-base font-extrabold tracking-[0.16em] text-[#F7D569] uppercase">
+                  {"> PROTOCOL_ANONYMITY: ACTIVE"}
+                </p>
+                <p className="mt-5 text-sm md:text-base leading-relaxed text-slate-100">
+                  Shadowroom is a zero-persistence environment. We do not use databases, tracking cookies, or server-side logging. Your messages and files exist only in the P2P tunnel between you and your peers. No traces left behind.
+                </p>
+              </div>
+
+              <div className="absolute bottom-0 left-0 h-[2px] w-full bg-[#F7D569]/25">
+                <motion.div
+                  className="h-full bg-[#F7D569]"
+                  initial={{ width: "100%" }}
+                  animate={{ width: "0%" }}
+                  transition={{ duration: 8, ease: "linear" }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
       {/* ─── Incoming File Offer Accept/Decline ─── */}
       {pendingOffers.length > 0 && (
@@ -2397,11 +2436,16 @@ export function ShadowRoomApp() {
         <ToastContainer toasts={toasts} onRemove={removeToast} />
       </div>
 
-      {isShadowLocked && (
-        <div className="shadow-lock-overlay" role="alert" aria-live="assertive">
-          <div className="shadow-lock-card">
-            <div className="shadow-lock-title">SHADOW_LOCKED</div>
-            <div className="shadow-lock-subtitle">Window focus lost. Return to this tab to continue.</div>
+      {isManualLocked && (
+        <div
+          className="fixed inset-0 z-[12000] flex items-center justify-center bg-[#0F111D]/70 backdrop-blur-3xl px-4"
+          role="alert"
+          aria-live="assertive"
+          onClick={() => setIsManualLocked(false)}
+        >
+          <div className="border-2 border-[#F7D569] bg-[#0F111D] px-7 py-5 text-center shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+            <div className="text-[#F7D569] text-base font-extrabold tracking-[0.12em]">[ SYSTEM_LOCKED ]</div>
+            <div className="mt-2 text-xs tracking-[0.08em] text-slate-300 uppercase">Click anywhere to unlock</div>
           </div>
         </div>
       )}
