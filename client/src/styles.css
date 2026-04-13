@@ -207,13 +207,13 @@ a {
 .theme-toggle {
   width: 45px;
   height: 45px;
-  background: var(--bg-tertiary);
-  border: 2px solid #0F111D;
-  color: var(--text-primary);
+  background: #0F111D;
+  border: 2px solid #F7D569;
+  color: #F7D569;
   border-radius: 0;
   cursor: pointer;
   font-size: 1.1rem;
-  transition: all 0.3s ease;
+  transition: all 0.4s cubic-bezier(0.23, 0.86, 0.39, 0.96);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -230,9 +230,9 @@ a {
 }
 
 .light .theme-toggle {
-  background: var(--bg-tertiary);
-  border-color: #0F111D;
-  color: var(--text-primary);
+  background: #FFFFFF;
+  border-color: #020617;
+  color: #020617;
 }
 
 /* ==================== BUTTONS ==================== */
@@ -460,8 +460,8 @@ a {
   border: 2px solid #0F111D;
   box-shadow: 4px 4px 0px #F7D569;
   transition: transform 0.4s cubic-bezier(0.23, 0.86, 0.39, 0.96),
-    border-color 0.4s ease,
-    box-shadow 0.4s ease;
+              border-color 0.4s ease,
+              box-shadow 0.4s ease;
   position: relative;
   overflow: hidden;
 }
@@ -997,47 +997,6 @@ a {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  position: relative;
-}
-
-.go-bottom-btn {
-  position: absolute;
-  right: 1.2rem;
-  bottom: 1.2rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  background: #0F111D;
-  color: #F7D569;
-  border: 2px solid #F7D569;
-  border-radius: 0;
-  padding: 0.55rem 0.8rem;
-  font-size: 0.82rem;
-  font-weight: 700;
-  box-shadow: 4px 4px 0px rgba(247, 213, 105, 0.45);
-  cursor: pointer;
-  z-index: 20;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.go-bottom-btn:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0px rgba(247, 213, 105, 0.5);
-}
-
-.go-bottom-indicator {
-  min-width: 18px;
-  height: 18px;
-  padding: 0 0.25rem;
-  border-radius: 999px;
-  background: #EF4444;
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.67rem;
-  font-weight: 700;
-  line-height: 1;
 }
 
 .messages-container {
@@ -1769,25 +1728,6 @@ a {
 
 .user-item:hover {
   background: var(--bg-tertiary);
-}
-
-.kick-user-btn {
-  border: 1px solid #7f1d1d;
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-  border-radius: 8px;
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform 0.2s ease, background 0.2s ease;
-}
-
-.kick-user-btn:hover {
-  transform: translate(-1px, -1px);
-  background: rgba(239, 68, 68, 0.25);
 }
 
 .user-avatar {
@@ -2613,52 +2553,6 @@ a {
   cursor: pointer;
   font-size: 0.7rem;
   transition: all 0.2s ease;
-}
-
-.shadow-app.locked {
-  filter: blur(14px);
-  pointer-events: none;
-  user-select: none;
-}
-
-.shadow-lock-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 12000;
-  background: rgba(8, 11, 20, 0.65);
-  backdrop-filter: blur(3px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-}
-
-.shadow-lock-card {
-  width: min(440px, 100%);
-  background: #0F111D;
-  border: 2px solid #F7D569;
-  box-shadow: 6px 6px 0px rgba(247, 213, 105, 0.45);
-  padding: 1.2rem 1.4rem;
-  text-align: center;
-}
-
-.shadow-lock-title {
-  color: #F7D569;
-  font-size: 1.1rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-}
-
-.shadow-lock-subtitle {
-  margin-top: 0.35rem;
-  color: #d6deec;
-  font-size: 0.85rem;
-}
-
-@media print {
-  body {
-    display: none !important;
-  }
 }
 
 .selected-file-remove:hover {
