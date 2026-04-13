@@ -171,7 +171,6 @@ export function ShadowRoomApp() {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const fileInputRef = useRef(null);
   const uploadFileInputRef = useRef(null);
-  const isInternalActionRef = useRef(false);
 
   // Reply / tagging state
   const [replyingTo, setReplyingTo] = useState(null);
@@ -304,25 +303,17 @@ export function ShadowRoomApp() {
     };
 
     const onContextMenuAttempt = (event) => {
-      // Allow right-click but keep blur-on-focus-loss active
-      // User can right-click to inspect, but if they move mouse to DevTools, screen will blur
       event.preventDefault();
+      lockUi();
     };
 
-    const onBlur = () => {
-      // Only lock if not in internal action (file-picker bypass)
-      if (!isInternalActionRef.current) {
-        lockUi();
-      }
-    };
-
-    window.addEventListener("blur", onBlur);
+    window.addEventListener("blur", lockUi);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("contextmenu", onContextMenuAttempt);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
-      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("blur", lockUi);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("contextmenu", onContextMenuAttempt);
       document.removeEventListener("visibilitychange", onVisibilityChange);
@@ -331,18 +322,7 @@ export function ShadowRoomApp() {
 
   const handleContextMenu = useCallback((event) => {
     event.preventDefault();
-    // Note: Removed automatic lock to allow developer tools inspection
-    // Blur event will still trigger lock if focus truly leaves the window
-  }, []);
-
-  const openFilePickerWithExemption = useCallback(() => {
-    // Set internal action flag to bypass blur-lock during file picker
-    isInternalActionRef.current = true;
-    uploadFileInputRef.current?.click();
-    // Reset after 2 seconds to restore normal security behavior
-    setTimeout(() => {
-      isInternalActionRef.current = false;
-    }, 2000);
+    setIsManualLocked(true);
   }, []);
 
   // On first load, allow direct join via roomCode query and keep auth if no session.
@@ -2172,7 +2152,7 @@ export function ShadowRoomApp() {
           <div className="modal-body">
             <div
               className="upload-zone"
-              onClick={openFilePickerWithExemption}
+              onClick={() => uploadFileInputRef.current?.click()}
               onDragOver={(e) => {
                 e.preventDefault();
                 e.currentTarget.classList.add("drag-over");
