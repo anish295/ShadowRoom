@@ -299,10 +299,6 @@ export function ShadowRoomApp() {
     };
   }, []);
 
-  const handleContextMenu = useCallback((event) => {
-    event.preventDefault();
-  }, []);
-
   // On first load, allow direct join via roomCode query and keep auth if no session.
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -525,10 +521,12 @@ export function ShadowRoomApp() {
 
     const onScroll = () => {
       const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-      const nearBottom = distanceFromBottom <= 200;
+      const nearBottom = distanceFromBottom <= 100;
       isNearBottomRef.current = nearBottom;
-      setShowGoToBottom(!nearBottom);
-      if (nearBottom) setUnreadWhileScrolled(0);
+      if (nearBottom) {
+        setUnreadWhileScrolled(0);
+        setShowGoToBottom(false);
+      }
     };
 
     onScroll();
@@ -1773,7 +1771,12 @@ export function ShadowRoomApp() {
               title="Go to latest message"
             >
               <i className="fas fa-arrow-down"></i>
-              {unreadWhileScrolled > 0 && <span className="go-bottom-dot" />}
+              <span>Go to Bottom</span>
+              {unreadWhileScrolled > 0 && (
+                <span className="go-bottom-indicator">
+                  {unreadWhileScrolled > 99 ? "99+" : unreadWhileScrolled}
+                </span>
+              )}
             </button>
           )}
 
@@ -2254,10 +2257,7 @@ export function ShadowRoomApp() {
 
   return (
     <>
-      <div
-        className={isShadowLocked ? "shadow-app stealth-blur" : "shadow-app"}
-        onContextMenu={handleContextMenu}
-      >
+      <div className={isShadowLocked ? "shadow-app locked" : "shadow-app"}>
         {currentView === "auth" ? renderAuthView() : renderChatView()}
         {renderModals()}
 
