@@ -8,7 +8,7 @@ import React, {
   Suspense,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Moon, Sun, Smile } from "lucide-react";
+import { ChevronDown, Moon, Sun, Smile } from "lucide-react";
 import { io } from "socket.io-client";
 import axios from "axios";
 import { sendFileP2P, setupFileReceiver, triggerDownload } from "./services/fileTransfer.js";
@@ -158,6 +158,8 @@ export function ShadowRoomApp() {
   const [mobileActionsVisible, setMobileActionsVisible] = useState(false);
   const [connectedUsers, setConnectedUsers] = useState([]);
   const [typingUsers, setTypingUsers] = useState([]);
+  const [showGoToBottom, setShowGoToBottom] = useState(false);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
 
   // Toasts
   const [toasts, setToasts] = useState([]);
@@ -178,6 +180,8 @@ export function ShadowRoomApp() {
   sessionDataRef.current = sessionData;
 
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const isNearBottomRef = useRef(true);
   const messageInputRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const modalSendBtnRef = useRef(null);
@@ -243,9 +247,36 @@ export function ShadowRoomApp() {
     });
   };
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const getDistanceFromBottom = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return 0;
+    return container.scrollHeight - container.scrollTop - container.clientHeight;
   }, []);
+
+  const scrollToBottom = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "smooth",
+      });
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    isNearBottomRef.current = true;
+    setShowGoToBottom(false);
+    setHasNewMessages(false);
+  }, []);
+
+  const handleMessagesScroll = useCallback(() => {
+    const distanceFromBottom = getDistanceFromBottom();
+    const isNearBottom = distanceFromBottom <= 200;
+    isNearBottomRef.current = isNearBottom;
+    setShowGoToBottom(!isNearBottom);
+    if (isNearBottom) {
+      setHasNewMessages(false);
+    }
+  }, [getDistanceFromBottom]);
 
   // Theme toggle
   const toggleTheme = useCallback(() => {
@@ -422,8 +453,31 @@ export function ShadowRoomApp() {
 
   // Scroll to bottom on new messages
   useEffect(() => {
-    scrollToBottom();
+    if (isNearBottomRef.current) {
+      scrollToBottom();
+    } else if (messages.length > 0) {
+      setShowGoToBottom(true);
+      setHasNewMessages(true);
+    }
   }, [messages, scrollToBottom]);
+
+  useEffect(() => {
+    if (currentView !== "chat") return;
+
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const onScroll = () => {
+      handleMessagesScroll();
+    };
+
+    container.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+
+    return () => {
+      container.removeEventListener("scroll", onScroll);
+    };
+  }, [currentView, handleMessagesScroll]);
 
   // (Join detection is handled directly inside the socket "users-updated" handler above)
 
@@ -596,6 +650,7 @@ export function ShadowRoomApp() {
       text: messageText.trim(),
       roomCode: sessionData.roomCode,
       userName: sessionData.userName,
+      userId: socket.id,
       ts: Date.now(),
       ...(replyingTo ? { replyTo: replyingTo } : {}),
     };
@@ -604,6 +659,7 @@ export function ShadowRoomApp() {
     setMessages((prev) => [...prev, { ...payload, self: true }]);
     setMessageText("");
     setReplyingTo(null);
+    scrollToBottom();
 
     // Re-focus the message input after sending
     messageInputRef.current?.focus();
@@ -860,6 +916,7 @@ export function ShadowRoomApp() {
         fileSize: file.size,
         fileMime: file.type || "application/octet-stream",
         userName: sessionData.userName,
+        userId: socket.id,
         ts: Date.now(),
         roomCode: sessionData.roomCode,
         self: true,
@@ -881,9 +938,7 @@ export function ShadowRoomApp() {
   const handleEmojiClick = useCallback((emoji) => {
     setMessageText((prev) => `${prev}${emoji}`);
     setEmojiPickerOpen(false);
-    requestAnimationFrame(() => {
-      messageInputRef.current?.focus();
-    });
+    messageInputRef.current?.focus();
   }, []);
 
   const handlePaste = useCallback((event) => {
@@ -910,6 +965,9 @@ export function ShadowRoomApp() {
     setMessages([]);
     setConnectedUsers([]);
     setTypingUsers([]);
+    setShowGoToBottom(false);
+    setHasNewMessages(false);
+    isNearBottomRef.current = true;
     setSessionData(null);
     localStorage.removeItem(SESSION_KEY);
     window.history.replaceState(null, "", "/");
@@ -1122,7 +1180,7 @@ export function ShadowRoomApp() {
         </div>
         <div className="nav-actions">
           <button
-            className="theme-toggle"
+            className="header-btn theme-toggle-btn"
             onClick={toggleTheme}
             title="Toggle Theme"
           >
@@ -1374,10 +1432,9 @@ export function ShadowRoomApp() {
                 )}
               </button>
               <button
-                className="theme-toggle"
+                className="header-btn theme-toggle-btn"
                 onClick={toggleTheme}
                 title="Toggle Theme"
-                style={{ width: 45, height: 45 }}
               >
                 <motion.span
                   className="theme-icon-wrap"
@@ -1520,7 +1577,7 @@ export function ShadowRoomApp() {
 
         <div className="chat-messages-area">
           {/* Messages */}
-          <div className="messages-container custom-scrollbar">
+          <div ref={messagesContainerRef} className="messages-container custom-scrollbar">
             {/* System welcome message */}
             <div className="system-message">
               <div className="system-message-content">
@@ -1585,7 +1642,8 @@ export function ShadowRoomApp() {
                           onClick={() => {
                             setReplyingTo({
                               msgId: m.msgId,
-                              userName: m.self ? "You" : m.userName || "Anon",
+                              userName: m.userName || sessionData?.userName || "Anon",
+                              userId: m.userId || socket.id || null,
                               snippet: (m.text || "").slice(0, 120),
                             });
                             messageInputRef.current?.focus();
@@ -1640,6 +1698,34 @@ export function ShadowRoomApp() {
             })}
             <div ref={messagesEndRef} />
           </div>
+
+          <AnimatePresence>
+            {currentView === "chat" && showGoToBottom && (
+              <motion.button
+                key="go-to-bottom"
+                type="button"
+                onClick={scrollToBottom}
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0, opacity: 0 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                className="fixed bottom-24 right-8 z-50 flex h-12 w-12 items-center justify-center rounded-full border-2 border-[#F7D569] bg-[#1E293B] text-[#F7D569] shadow-lg active:scale-95"
+                aria-label="Go to bottom"
+              >
+                <ChevronDown size={20} strokeWidth={2.5} />
+                {hasNewMessages && (
+                  <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#F7D569] opacity-75" />
+                    <span className="relative inline-flex h-3.5 w-3.5 rounded-full border-2 border-[#1E293B] bg-[#F7D569]" />
+                  </span>
+                )}
+                <span
+                  aria-hidden="true"
+                  className="absolute bottom-0 left-0 h-[2px] w-full bg-[#F7D569]"
+                />
+              </motion.button>
+            )}
+          </AnimatePresence>
 
           {/* Typing indicator above input */}
           {typingUsers.length > 0 && (

@@ -194,7 +194,7 @@ export function registerSocketHandlers(io, { pinStore, logger, roomsByCode }) {
     // Use socket.to() instead of io.to() so the SENDER doesn't get their own message back
     // (the client already optimistically adds it to state)
     socket.on("send-message", (payload = {}) => {
-      const { text, roomCode, userName, ts, msgId, replyTo } = payload;
+      const { text, roomCode, userName, userId, ts, msgId, replyTo } = payload;
       if (!roomCode || !text) return;
 
       // Input validation: reject oversized messages
@@ -208,12 +208,14 @@ export function registerSocketHandlers(io, { pinStore, logger, roomsByCode }) {
         text: text.slice(0, 10_000),
         roomCode: code,
         userName: String(userName || "Anon").slice(0, 50),
+        userId: typeof userId === "string" ? userId.slice(0, 128) : socket.id,
         ts: ts || Date.now(),
         replyTo:
           replyTo && typeof replyTo === "object"
             ? {
                 msgId: String(replyTo.msgId || "").slice(0, 64),
                 userName: String(replyTo.userName || "").slice(0, 50),
+                userId: String(replyTo.userId || "").slice(0, 128),
                 snippet: String(replyTo.snippet || "").slice(0, 200),
               }
             : undefined,
